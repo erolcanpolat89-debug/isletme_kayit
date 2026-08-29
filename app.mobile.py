@@ -4,7 +4,7 @@ import pandas as pd
 from datetime import datetime
 
 # Sayfa Ayarları (Mobil Uyumlu)
-st.set_page_config(page_title="İşletme Takip", page_icon="🦪", layout="centered")
+st.set_page_config(page_title="MİDYECİ ABLA CANLI TAKİP", page_icon="🦪", layout="centered")
 
 # Veritabanı Bağlantısı
 def get_connection():
