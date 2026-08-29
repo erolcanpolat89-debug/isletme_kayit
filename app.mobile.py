@@ -72,7 +72,7 @@ except sqlite3.OperationalError:
 
 
 # Başlık
-st.title("🦪 İşletme Takip Otomasyonu")
+st.title("🦪 MİDYECİ ABLA CANLI TAKİP")
 
 # Sekmeler
 tab1, tab2, tab3, tab4 = st.tabs(["🏢 Firmalar", "🚚 Toptan İşlemler", "📊 Cari Ekstre", "🏪 Dükkan / Stok"])
