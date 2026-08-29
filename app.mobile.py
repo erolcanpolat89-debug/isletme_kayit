@@ -75,7 +75,7 @@ except sqlite3.OperationalError:
 st.title("🦪 MİDYECİ ABLA CANLI TAKİP")
 
 # Sekmeler
-tab1, tab2, tab3, tab4 = st.tabs(["🏢 Firmalar", "🚚 Toptan İşlemler", "📊 Cari Ekstre", "🏪 Dükkan / Stok"])
+tab1, tab2, tab3, tab4 = st.tabs(["🏢 Firmalar", "🚚 Toptan İşlemler", "📊 İŞLEM KONTROL", "🏪 CANLI SATIŞ"])
 
 bugun = datetime.now().strftime("%Y-%m-%d")
 
