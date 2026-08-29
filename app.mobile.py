@@ -51,6 +51,26 @@ cursor.execute('''
 ''')
 conn.commit()
 
+# EKSİK SÜTUNLARI DÜZELTME (Sütun yoksa otomatik ekler)
+try:
+    cursor.execute("ALTER TABLE toptan_satis ADD COLUMN islem_turu TEXT DEFAULT 'Satış'")
+    conn.commit()
+except sqlite3.OperationalError:
+    pass # Sütun zaten varsa hata vermesini engeller
+
+try:
+    cursor.execute("ALTER TABLE toptan_satis ADD COLUMN adet INTEGER DEFAULT 0")
+    conn.commit()
+except sqlite3.OperationalError:
+    pass
+
+try:
+    cursor.execute("ALTER TABLE toptan_satis ADD COLUMN birim_fiyat REAL DEFAULT 0.0")
+    conn.commit()
+except sqlite3.OperationalError:
+    pass
+
+
 # Başlık
 st.title("🦪 İşletme Takip Otomasyonu")
 
@@ -125,7 +145,6 @@ with tab1:
 # 2. SEKME: TOPTAN MIDYE SATIŞ VE TAHSİLAT
 # ==========================================
 with tab2:
-    # Kayıtlı firmaları çek
     df_firmalar_opt = pd.read_sql_query("SELECT firma_adi FROM firmalar ORDER BY firma_adi ASC", conn)
     firma_listesi = df_firmalar_opt["firma_adi"].tolist() if not df_firmalar_opt.empty else []
 
@@ -234,14 +253,12 @@ with tab3:
     if not df_firmalar_cari.empty:
         firmalar_list = df_firmalar_cari["firma_adi"].tolist()
         
-        # Firma Seçimi (Dokunarak Seçim)
         secili_firma_detay = st.selectbox("🔍 Detaylarını Görmek İstediğiniz Firmayı Seçin:", firmalar_list)
         
         if secili_firma_detay:
             st.divider()
             st.subheader(f"📌 {secili_firma_detay} - Hesap Özeti")
             
-            # Seçili firmanın verilerini hesapla
             df_f_satis = pd.read_sql_query(f"SELECT SUM(toplam_tutar) as t FROM toptan_satis WHERE firma_adi='{secili_firma_detay}' AND islem_turu='Satış'", conn)
             df_f_tahsilat = pd.read_sql_query(f"SELECT SUM(toplam_tutar) as t FROM toptan_satis WHERE firma_adi='{secili_firma_detay}' AND islem_turu='Tahsilat'", conn)
             
