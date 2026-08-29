@@ -1,4 +1,4 @@
-import streamlit as st
+Vimport streamlit as st
 import sqlite3
 import pandas as pd
 from datetime import datetime
@@ -137,7 +137,7 @@ for col, dtype in [("islem_turu", "TEXT DEFAULT 'Satış'"), ("adet", "INTEGER D
 # Kibarlaştırılmış Küçük Başlık
 st.markdown('<div class="custom-title">🦪 MİDYECİ ABLA CANLI TAKİP</div>', unsafe_allow_html=True)
 
-# Yeni Sekme Sıralaması: Dükkan -> Toptan -> Firmalar -> Cari Ekstre
+# Sekme Sıralaması: Dükkan -> Toptan -> Firmalar -> Cari Ekstre
 tab1, tab2, tab3, tab4 = st.tabs(["🏪 Dükkan", "🚚 Toptan", "🏢 Firmalar", "📊 Cari Ekstre"])
 
 bugun = datetime.now().strftime("%Y-%m-%d")
@@ -176,7 +176,7 @@ with tab1:
         secilen_d_tarih = st.date_input("Sorgulanacak Tarih Seçin:", datetime.now(), key="dukkan_tarih_sorgu")
         str_d_tarih = secilen_d_tarih.strftime("%Y-%m-%d")
         
-        df_dukkan_gun = pd.read_sql_query(f"SELECT id, tarih, islem_tipi, kategori, urun_adi, miktar, birim_fiyat, tutar FROM dukkan_hareket WHERE tarih='{str_d_tarih}' ORDER BY id DESC", conn)
+        df_dukkan_gun = pd.read_sql_query("SELECT id, tarih, islem_tipi, kategori, urun_adi, miktar, birim_fiyat, tutar FROM dukkan_hareket WHERE tarih=? ORDER BY id DESC", conn, params=(str_d_tarih,))
         
         if df_dukkan_gun.empty:
             st.warning(f"🔍 {str_d_tarih} tarihine ait dükkan hareketi bulunamadı.")
@@ -271,11 +271,12 @@ with tab1:
     st.divider()
     
     # Günlük Özet Kartları
-    df_dukkan_bugun = pd.read_sql_query(f"""
+    df_dukkan_bugun = pd.read_sql_query("""
         SELECT SUM(miktar) as adet, SUM(tutar) as ciro 
         FROM dukkan_hareket 
-        WHERE tarih='{bugun}' AND kategori='Midye Dolma' AND islem_tipi='Günlük Satış (Gelir)'
-    """, conn)
+        WHERE tarih=? AND kategori='Midye Dolma' AND islem_tipi='Günlük Satış (Gelir)'
+    """, conn, params=(bugun,))
+    
     d_adet = df_dukkan_bugun['adet'].iloc[0] or 0
     d_ciro = df_dukkan_bugun['ciro'].iloc[0] or 0.0
     
@@ -334,7 +335,7 @@ with tab2:
             secilen_tarih = st.date_input("Sorgulanacak Tarih Seçin:", datetime.now(), key="toptan_tarih_sorgu")
             str_tarih = secilen_tarih.strftime("%Y-%m-%d")
             
-            df_toptan_gun = pd.read_sql_query(f"SELECT id, firma_adi, tarih, islem_turu, adet, birim_fiyat, toplam_tutar, aciklama FROM toptan_satis WHERE tarih='{str_tarih}' ORDER BY id DESC", conn)
+            df_toptan_gun = pd.read_sql_query("SELECT id, firma_adi, tarih, islem_turu, adet, birim_fiyat, toplam_tutar, aciklama FROM toptan_satis WHERE tarih=? ORDER BY id DESC", conn, params=(str_tarih,))
             
             if df_toptan_gun.empty:
                 st.warning(f"🔍 {str_tarih} tarihine ait toptan işlem kaydı bulunamadı.")
@@ -519,32 +520,38 @@ with tab4:
             st.divider()
             st.markdown(f"### 📌 {secili_firma_detay}")
             
-            df_f_satis = pd.read_sql_query(f"SELECT SUM(toplam_tutar) as t FROM toptan_satis WHERE firma_adi='{secili_firma_detay}' AND islem_turu='Satış'", conn)
-            df_f_tahsilat = pd.read_sql_query(f"SELECT SUM(toplam_tutar) as t FROM toptan_satis WHERE firma_adi='{secili_firma_detay}' AND islem_turu='Tahsilat'", conn)
+            df_f_satis = pd.read_sql_query("SELECT SUM(toplam_tutar) as t FROM toptan_satis WHERE firma_adi=? AND islem_turu='Satış'", conn, params=(secili_firma_detay,))
+            df_f_tahsilat = pd.read_sql_query("SELECT SUM(toplam_tutar) as t FROM toptan_satis WHERE firma_adi=? AND islem_turu='Tahsilat'", conn, params=(secili_firma_detay,))
             
             tot_satis = df_f_satis['t'].iloc[0] or 0.0
             tot_tahsilat = df_f_tahsilat['t'].iloc[0] or 0.0
             net_bakiye = tot_satis - tot_tahsilat
             
-            st.metric("Toplam Satış", f"{tot_satis:,.2f} TL")
-            st.metric("Toplam Tahsilat", f"{tot_tahsilat:,.2f} TL")
-            
-            if net_bakiye > 0:
-                st.metric("Kalan Borç", f"{net_bakiye:,.2f} TL", delta="- Borçlu", delta_color="inverse")
-            elif net_bakiye < 0:
-                st.metric("Alacak Bakiyesi", f"{abs(net_bakiye):,.2f} TL", delta="+ Alacaklı", delta_color="normal")
-            else:
-                st.metric("Net Bakiye", "0.00 TL", delta="Dengede")
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Toplam Satış", f"{tot_satis:,.2f} TL")
+            with col2:
+                st.metric("Toplam Tahsilat", f"{tot_tahsilat:,.2f} TL")
+            with col3:
+                if net_bakiye > 0:
+                    st.metric("Kalan Borç", f"{net_bakiye:,.2f} TL", delta="- Borçlu", delta_color="inverse")
+                elif net_bakiye < 0:
+                    st.metric("Alacak Bakiyesi", f"{abs(net_bakiye):,.2f} TL", delta="+ Alacaklı", delta_color="normal")
+                else:
+                    st.metric("Net Bakiye", "0.00 TL", delta="Dengede")
                 
             st.write("**İşlem Geçmişi**")
-            df_ekstre = pd.read_sql_query(f"""
+            df_ekstre = pd.read_sql_query("""
                 SELECT tarih as 'Tarih', islem_turu as 'İşlem', adet as 'Adet', toplam_tutar as 'Tutar (TL)'
                 FROM toptan_satis 
-                WHERE firma_adi='{secili_firma_detay}' 
+                WHERE firma_adi=? 
                 ORDER BY id DESC
-            """, conn)
+            """, conn, params=(secili_firma_detay,))
             
             if not df_ekstre.empty:
                 st.dataframe(df_ekstre, use_container_width=True)
             else:
                 st.info("İşlem hareketi bulunmuyor.")
+
+# Bağlantıyı kapatma
+conn.close()
