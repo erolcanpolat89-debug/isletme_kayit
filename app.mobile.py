@@ -11,7 +11,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# OKUNABİLİR KOYU TEMA (GLASSMORPHISM) CSS
+# GÖRÜNÜR YAZILAR VE NET ETIKETLER İÇİN CSS GÜNCELLEMESİ
 st.markdown("""
 <style>
     /* Arka Plan Degrade (Soft Dark Gradient) */
@@ -20,15 +20,33 @@ st.markdown("""
         background-attachment: fixed;
     }
 
-    /* Tüm Etiket ve Yazı Renkleri Açık Beyaz/Gri */
-    .stApp, .stApp p, .stApp label, .stApp span, div[data-testid="stMarkdownContainer"] p, .stRadio label {
-        color: #f1f5f9 !important;
-        font-weight: 500;
+    /* TÜM FORM ETİKETLERİ VE METİNLER (Net Beyaz) */
+    .stApp, .stApp p, .stApp label, .stApp span, 
+    div[data-testid="stMarkdownContainer"] p, 
+    label[data-testid="stWidgetLabel"],
+    div[data-aria-selected] p {
+        color: #ffffff !important;
+        font-weight: 700 !important;
+        opacity: 1 !important;
+    }
+
+    /* Input/Form Etiketleri (Tarih, İşlem Tipi, Kategori vb. Başlıkları) */
+    label[data-testid="stWidgetLabel"] p {
+        font-size: 15px !important;
+        color: #f8fafc !important;
+        letter-spacing: 0.3px;
+    }
+
+    /* Radio (Seçenek) Buton Metinleri */
+    div[role="radiogroup"] label div[data-testid="stMarkdownContainer"] p {
+        color: #ffffff !important;
+        font-size: 14px !important;
+        font-weight: 600 !important;
     }
 
     /* Başlık Tasarımı */
     .custom-title {
-        font-size: 24px !important;
+        font-size: 26px !important;
         font-weight: 900;
         text-align: center;
         background: linear-gradient(90deg, #ff7e5f, #feb47b);
@@ -39,16 +57,10 @@ st.markdown("""
         letter-spacing: 0.5px;
     }
 
-    /* Radio (Seçenek) Buton Yazıları */
-    div[role="radiogroup"] label div[data-testid="stMarkdownContainer"] p {
-        color: #ffffff !important;
-        font-weight: 600 !important;
-    }
-
     /* Sekme (Tabs) Butonları */
     .stTabs [data-baseweb="tab-list"] {
         gap: 4px;
-        background: rgba(255, 255, 255, 0.05);
+        background: rgba(255, 255, 255, 0.08);
         padding: 4px;
         border-radius: 12px;
     }
@@ -58,7 +70,7 @@ st.markdown("""
         border-radius: 8px;
         padding: 6px 10px;
         font-weight: 600;
-        color: #94a3b8 !important;
+        color: #cbd5e1 !important;
     }
 
     .stTabs [aria-selected="true"] {
@@ -66,13 +78,24 @@ st.markdown("""
         color: #ffffff !important;
     }
 
-    /* Form ve Kart Alanı (Şeffaf Buzlu Cam Kutusu) */
+    /* Form ve Kart Alanı (Glassmorphic Kutular) */
     div[data-testid="stForm"], div[data-testid="stExpander"] {
         background: rgba(30, 41, 59, 0.85) !important;
-        border: 1px solid rgba(255, 255, 255, 0.12) !important;
+        border: 1px solid rgba(255, 255, 255, 0.15) !important;
         border-radius: 16px !important;
         box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
         padding: 18px !important;
+    }
+
+    /* Girdi Kutularının İçi (Tarih, Selectbox, Input Kutuları) */
+    div[data-baseweb="input"], div[data-baseweb="select"] {
+        background-color: #f8fafc !important;
+        border-radius: 10px !important;
+    }
+
+    input, select, textarea {
+        color: #0f172a !important;
+        font-weight: 700 !important;
     }
 
     /* Butonlar */
