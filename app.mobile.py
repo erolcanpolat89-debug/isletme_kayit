@@ -301,8 +301,11 @@ with tab2:
 
         if islem_turu_toptan == "Yeni İşlem":
             st.subheader("Yeni Toptan İşlem")
+            
+            # İşlem tipini formun DIŞINA aldık ki seçildiği an sayfa yenilenip alanları güncelleyebilsin:
+            islem_turu = st.selectbox("İşlem Tipi", ["Satış (Borç Ekle)", "Tahsilat (Borç Düş/Alacak)"], key="toptan_islem_tipi_select")
+
             with st.form("toptan_form", clear_on_submit=True):
-                islem_turu = st.selectbox("İşlem Tipi", ["Satış (Borç Ekle)", "Tahsilat (Borç Düş/Alacak)"])
                 firma = st.selectbox("Firma Seçin", firma_listesi)
                 tarih = st.date_input("Tarih", datetime.now())
                 
@@ -314,7 +317,7 @@ with tab2:
                 else:
                     adet = 0
                     birim_fiyat = 0.0
-                    toplam_tutar = st.number_input("Tahsil Edilen Tutar (TL)", min_value=0.0, step=50.0, value=1000.0, format="%.2f")
+                    toplam_tutar = st.number_input("Tahsil Edilen Tutar (TL)", min_value=0.0, step=50.0, value=2430.0, format="%.2f")
                     st.success(f"Tahsilat Tutarı: **{toplam_tutar:,.2f} TL**")
 
                 aciklama = st.text_input("Açıklama / Not")
