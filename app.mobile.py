@@ -11,37 +11,54 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# GÖRÜNÜR YAZILAR VE NET ETIKETLER İÇİN CSS GÜNCELLEMESİ
+# Koyu Tema & Okunabilirlik Düzeltmeleri İçin CSS
 st.markdown("""
 <style>
-    /* Arka Plan Degrade (Soft Dark Gradient) */
+    /* Arka Plan Degrade (Soft Dark) */
     .stApp {
         background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
         background-attachment: fixed;
     }
 
-    /* TÜM FORM ETİKETLERİ VE METİNLER (Net Beyaz) */
+    /* TÜM FORM ETİKETLERİ VE BAŞLIKLAR (Net Beyaz ve Kalın) */
     .stApp, .stApp p, .stApp label, .stApp span, 
     div[data-testid="stMarkdownContainer"] p, 
-    label[data-testid="stWidgetLabel"],
-    div[data-aria-selected] p {
+    label[data-testid="stWidgetLabel"] p {
         color: #ffffff !important;
         font-weight: 700 !important;
         opacity: 1 !important;
     }
 
-    /* Input/Form Etiketleri (Tarih, İşlem Tipi, Kategori vb. Başlıkları) */
-    label[data-testid="stWidgetLabel"] p {
-        font-size: 15px !important;
-        color: #f8fafc !important;
-        letter-spacing: 0.3px;
-    }
-
     /* Radio (Seçenek) Buton Metinleri */
     div[role="radiogroup"] label div[data-testid="stMarkdownContainer"] p {
         color: #ffffff !important;
-        font-size: 14px !important;
-        font-weight: 600 !important;
+    }
+
+    /* GİRDİ KUTULARININ İÇİ VE TARİH KUTUSU METİN RENGİ (KESİN ÇÖZÜM) */
+    div[data-baseweb="input"] input, 
+    div[data-baseweb="select"] input,
+    div[data-baseweb="input"] input:disabled,
+    input[type="text"], 
+    input[type="number"],
+    div[data-baseweb="base-input"] input {
+        color: #0f172a !important; /* Koyu Lacivert/Siyah Metin */
+        -webkit-text-fill-color: #0f172a !important; /* Safari/Mobil Chrome tam görünürlük */
+        font-weight: 800 !important;
+        background-color: #ffffff !important;
+    }
+
+    /* Tarih Seçici Ve Tüm Input Arka Planları */
+    div[data-baseweb="input"], 
+    div[data-baseweb="select"],
+    div[data-baseweb="base-input"] {
+        background-color: #ffffff !important;
+        border-radius: 10px !important;
+    }
+
+    /* Selectbox Seçilen Metin Rengi */
+    div[data-baseweb="select"] div {
+        color: #0f172a !important;
+        font-weight: 700 !important;
     }
 
     /* Başlık Tasarımı */
@@ -80,22 +97,11 @@ st.markdown("""
 
     /* Form ve Kart Alanı (Glassmorphic Kutular) */
     div[data-testid="stForm"], div[data-testid="stExpander"] {
-        background: rgba(30, 41, 59, 0.85) !important;
+        background: rgba(30, 41, 59, 0.95) !important;
         border: 1px solid rgba(255, 255, 255, 0.15) !important;
         border-radius: 16px !important;
         box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
         padding: 18px !important;
-    }
-
-    /* Girdi Kutularının İçi (Tarih, Selectbox, Input Kutuları) */
-    div[data-baseweb="input"], div[data-baseweb="select"] {
-        background-color: #f8fafc !important;
-        border-radius: 10px !important;
-    }
-
-    input, select, textarea {
-        color: #0f172a !important;
-        font-weight: 700 !important;
     }
 
     /* Butonlar */
@@ -184,7 +190,7 @@ for col, dtype in [("islem_turu", "TEXT DEFAULT 'Satış'"), ("adet", "INTEGER D
     except sqlite3.OperationalError:
         pass
 
-# Şık Başlık
+# Başlık
 st.markdown('<div class="custom-title">🦪 MİDYECİ ABLA CANLI TAKİP</div>', unsafe_allow_html=True)
 
 # Sekme Sıralaması
