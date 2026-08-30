@@ -3,7 +3,7 @@ import sqlite3
 import pandas as pd
 from datetime import datetime
 
-# Sayfa Ayarları (Mobil Uyumlu)
+# Sayfa Ayarları
 st.set_page_config(
     page_title="Midyeci Abla Canlı Takip",
     page_icon="🦪",
@@ -11,16 +11,16 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Koyu Tema & Okunabilirlik Düzeltmeleri İçin CSS
+# Koyu Tema & Tarih / Detay Kutusu Metin Rengi Düzeltmesi
 st.markdown("""
 <style>
-    /* Arka Plan Degrade (Soft Dark) */
+    /* Arka Plan Degrade */
     .stApp {
         background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
         background-attachment: fixed;
     }
 
-    /* TÜM FORM ETİKETLERİ VE BAŞLIKLAR (Net Beyaz ve Kalın) */
+    /* TÜM ETIKETLER VE BAŞLIKLAR (Beyaz ve Kalın) */
     .stApp, .stApp p, .stApp label, .stApp span, 
     div[data-testid="stMarkdownContainer"] p, 
     label[data-testid="stWidgetLabel"] p {
@@ -34,31 +34,32 @@ st.markdown("""
         color: #ffffff !important;
     }
 
-    /* GİRDİ KUTULARININ İÇİ VE TARİH KUTUSU METİN RENGİ (KESİN ÇÖZÜM) */
+    /* TARİH, DETAY VE TÜM INPUT KUTULARININ İÇİ (Koyu Siyah Yazı) */
     div[data-baseweb="input"] input, 
-    div[data-baseweb="select"] input,
-    div[data-baseweb="input"] input:disabled,
+    div[data-baseweb="base-input"] input,
+    div[data-testid="stTextInput"] input,
+    div[data-testid="stDateInput"] input,
     input[type="text"], 
-    input[type="number"],
-    div[data-baseweb="base-input"] input {
-        color: #0f172a !important; /* Koyu Lacivert/Siyah Metin */
-        -webkit-text-fill-color: #0f172a !important; /* Safari/Mobil Chrome tam görünürlük */
+    input[type="number"] {
+        color: #000000 !important;
+        -webkit-text-fill-color: #000000 !important; /* Safari ve Mobil cihazlar için zorunlu */
         font-weight: 800 !important;
         background-color: #ffffff !important;
+        opacity: 1 !important;
     }
 
-    /* Tarih Seçici Ve Tüm Input Arka Planları */
+    /* Kutuların Arka Planı (Tam Beyaz) */
     div[data-baseweb="input"], 
-    div[data-baseweb="select"],
-    div[data-baseweb="base-input"] {
+    div[data-baseweb="base-input"],
+    div[data-baseweb="select"] {
         background-color: #ffffff !important;
         border-radius: 10px !important;
     }
 
-    /* Selectbox Seçilen Metin Rengi */
+    /* Selectbox (Açılır Menü) Seçilen Yazı Rengi */
     div[data-baseweb="select"] div {
-        color: #0f172a !important;
-        font-weight: 700 !important;
+        color: #000000 !important;
+        font-weight: 800 !important;
     }
 
     /* Başlık Tasarımı */
@@ -71,7 +72,6 @@ st.markdown("""
         -webkit-text-fill-color: transparent;
         margin-bottom: 20px;
         margin-top: -10px;
-        letter-spacing: 0.5px;
     }
 
     /* Sekme (Tabs) Butonları */
@@ -95,7 +95,7 @@ st.markdown("""
         color: #ffffff !important;
     }
 
-    /* Form ve Kart Alanı (Glassmorphic Kutular) */
+    /* Glassmorphic Kutu Alanları */
     div[data-testid="stForm"], div[data-testid="stExpander"] {
         background: rgba(30, 41, 59, 0.95) !important;
         border: 1px solid rgba(255, 255, 255, 0.15) !important;
@@ -104,7 +104,7 @@ st.markdown("""
         padding: 18px !important;
     }
 
-    /* Butonlar */
+    /* Kaydet Butonları */
     div.stButton > button, div.stFormSubmitButton > button {
         width: 100% !important;
         height: 50px !important;
@@ -145,7 +145,7 @@ def get_connection():
 conn = get_connection()
 cursor = conn.cursor()
 
-# Tabloları Oluşturma
+# Tablolar
 cursor.execute('''
     CREATE TABLE IF NOT EXISTS firmalar (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -193,13 +193,13 @@ for col, dtype in [("islem_turu", "TEXT DEFAULT 'Satış'"), ("adet", "INTEGER D
 # Başlık
 st.markdown('<div class="custom-title">🦪 MİDYECİ ABLA CANLI TAKİP</div>', unsafe_allow_html=True)
 
-# Sekme Sıralaması
+# Sekmeler
 tab1, tab2, tab3, tab4 = st.tabs(["🏪 Dükkan", "🚚 Toptan", "🏢 Firmalar", "📊 Cari Ekstre"])
 
 bugun = datetime.now().strftime("%Y-%m-%d")
 
 # ==========================================
-# 1. SEKME: DÜKKAN CANLI SATIŞ & STOK
+# 1. SEKME: DÜKKAN
 # ==========================================
 with tab1:
     st.subheader("🏪 Dükkan Hareketleri")
@@ -326,7 +326,7 @@ with tab1:
 
     st.divider()
     
-    # Günlük Özet Kartları
+    # Günlük Özet
     df_dukkan_bugun = pd.read_sql_query("""
         SELECT SUM(miktar) as adet, SUM(tutar) as ciro 
         FROM dukkan_hareket 
@@ -347,7 +347,7 @@ with tab1:
     st.dataframe(df_dukkan_view, use_container_width=True)
 
 # ==========================================
-# 2. SEKME: TOPTAN İŞLEMLER
+# 2. SEKME: TOPTAN
 # ==========================================
 with tab2:
     df_firmalar_opt = pd.read_sql_query("SELECT firma_adi FROM firmalar ORDER BY firma_adi ASC", conn)
@@ -613,5 +613,4 @@ with tab4:
             else:
                 st.info("İşlem hareketi bulunmuyor.")
 
-# Bağlantıyı kapatma
 conn.close()
