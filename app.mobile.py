@@ -11,24 +11,24 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# MODERN BACKGROUND VE BEYOĞLU / GLASSMORPHISM STİLİ (CSS)
+# OKUNABİLİR KOYU TEMA (GLASSMORPHISM) CSS
 st.markdown("""
 <style>
-    /* Arka Plan Degrade (Soft Gradient) */
+    /* Arka Plan Degrade (Soft Dark Gradient) */
     .stApp {
         background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
         background-attachment: fixed;
-        color: #f8fafc;
     }
 
-    /* Genel Yazı Fontu ve Renkleri */
-    html, body, [class*="css"] {
-        font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif !important;
+    /* Tüm Etiket ve Yazı Renkleri Açık Beyaz/Gri */
+    .stApp, .stApp p, .stApp label, .stApp span, div[data-testid="stMarkdownContainer"] p, .stRadio label {
+        color: #f1f5f9 !important;
+        font-weight: 500;
     }
 
     /* Başlık Tasarımı */
     .custom-title {
-        font-size: 26px !important;
+        font-size: 24px !important;
         font-weight: 900;
         text-align: center;
         background: linear-gradient(90deg, #ff7e5f, #feb47b);
@@ -39,51 +39,40 @@ st.markdown("""
         letter-spacing: 0.5px;
     }
 
+    /* Radio (Seçenek) Buton Yazıları */
+    div[role="radiogroup"] label div[data-testid="stMarkdownContainer"] p {
+        color: #ffffff !important;
+        font-weight: 600 !important;
+    }
+
     /* Sekme (Tabs) Butonları */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 6px;
-        justify-content: space-between;
+        gap: 4px;
         background: rgba(255, 255, 255, 0.05);
-        padding: 6px;
+        padding: 4px;
         border-radius: 12px;
-        backdrop-filter: blur(10px);
     }
 
     .stTabs [data-baseweb="tab"] {
-        height: 48px;
-        white-space: nowrap;
         background-color: transparent;
         border-radius: 8px;
         padding: 6px 10px;
         font-weight: 600;
-        font-size: 14px !important;
-        color: #cbd5e1 !important;
-        flex: 1;
-        text-align: center;
-        border: none !important;
-        transition: all 0.3s ease;
+        color: #94a3b8 !important;
     }
 
     .stTabs [aria-selected="true"] {
         background: linear-gradient(135deg, #ff4b4b, #dc2626) !important;
-        color: white !important;
-        box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+        color: #ffffff !important;
     }
 
-    /* Form ve Kart Alanları (Şeffaf Buzlu Cam Etkisi - Glassmorphism) */
+    /* Form ve Kart Alanı (Şeffaf Buzlu Cam Kutusu) */
     div[data-testid="stForm"], div[data-testid="stExpander"] {
-        background: rgba(30, 41, 59, 0.7) !important;
-        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        background: rgba(30, 41, 59, 0.85) !important;
+        border: 1px solid rgba(255, 255, 255, 0.12) !important;
         border-radius: 16px !important;
-        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-        backdrop-filter: blur(8px);
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
         padding: 18px !important;
-    }
-
-    /* Input ve Select Kutuları */
-    input, select, textarea, div[data-baseweb="select"] {
-        border-radius: 10px !important;
-        border: 1px solid rgba(255, 255, 255, 0.15) !important;
     }
 
     /* Butonlar */
@@ -97,21 +86,14 @@ st.markdown("""
         color: white !important;
         border: none !important;
         box-shadow: 0 4px 14px rgba(239, 68, 68, 0.4);
-        transition: transform 0.2s, box-shadow 0.2s;
-    }
-
-    div.stButton > button:hover, div.stFormSubmitButton > button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(239, 68, 68, 0.6);
     }
 
     /* Metrik Kartları */
     div[data-testid="stMetric"] {
         background: rgba(255, 255, 255, 0.05);
-        border: 1px solid rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.1);
         border-radius: 14px;
         padding: 12px 16px;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
     }
 
     div[data-testid="stMetricValue"] {
@@ -120,11 +102,8 @@ st.markdown("""
         color: #ff6b6b !important;
     }
 
-    /* Tablo Görünümü */
-    div[data-testid="stDataFrame"] {
-        border-radius: 12px;
-        overflow: hidden;
-        border: 1px solid rgba(255, 255, 255, 0.1);
+    div[data-testid="stMetricLabel"] {
+        color: #cbd5e1 !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -174,7 +153,7 @@ cursor.execute('''
 ''')
 conn.commit()
 
-# Veritabanı Otomatik Sütun Güncelleme
+# Otomatik Sütun Güncelleme
 for col, dtype in [("islem_turu", "TEXT DEFAULT 'Satış'"), ("adet", "INTEGER DEFAULT 0"), ("birim_fiyat", "REAL DEFAULT 0.0")]:
     try:
         cursor.execute(f"ALTER TABLE toptan_satis ADD COLUMN {col} {dtype}")
@@ -352,8 +331,6 @@ with tab2:
 
         if islem_turu_toptan == "Yeni İşlem":
             st.subheader("Yeni Toptan İşlem")
-            
-            # Form Dışında Seçim (Anında Değişim İçin)
             islem_turu = st.selectbox("İşlem Tipi", ["Satış (Borç Ekle)", "Tahsilat (Borç Düş/Alacak)"], key="toptan_islem_tipi_select")
 
             with st.form("toptan_form", clear_on_submit=True):
