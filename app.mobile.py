@@ -541,11 +541,13 @@ with tab1:
     st.divider()
     
     # Günlük Özet
+    bugun_str = datetime.now().strftime("%Y-%m-%d")
+    
     df_dukkan_bugun = run_query_df("""
         SELECT SUM(miktar) as adet, SUM(tutar) as ciro 
         FROM dukkan_hareket 
-        WHERE tarih=? AND kategori='Midye Dolma' AND islem_tipi='Günlük Satış (Gelir)'
-    """, [bugun])
+        WHERE SUBSTR(tarih, 1, 10) = ? AND kategori = 'Midye' AND islem_tipi = 'Günlük Satış (Gelir)'
+    """, [bugun_str])
     
     d_adet = df_dukkan_bugun['adet'].iloc[0] if not df_dukkan_bugun.empty and pd.notnull(df_dukkan_bugun['adet'].iloc[0]) else 0
     d_ciro = df_dukkan_bugun['ciro'].iloc[0] if not df_dukkan_bugun.empty and pd.notnull(df_dukkan_bugun['ciro'].iloc[0]) else 0.0
