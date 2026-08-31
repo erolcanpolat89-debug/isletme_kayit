@@ -37,26 +37,44 @@ st.markdown(f"""
         background: transparent !important;
     }}
 
-    /* SAYDAM GRİ GÖLGELİ KUTU (Kayar Yazı İçin) */
-    .marquee-box {{
-        background: rgba(255, 255, 255, 0.10);
-        border: 1px solid rgba(255, 255, 255, 0.25);
-        border-radius: 12px;
-        padding: 10px 15px;
-        margin-top: 10px;
-        margin-bottom: 20px;
+    /* NEON YANIP SÖNEN ORTALI KUTU TASARIMI */
+    @keyframes neonPulse {{
+        0% {{
+            color: #e5c158;
+            text-shadow: 0 0 5px #ffcc00, 0 0 10px #ffcc00, 0 0 15px #ff9900;
+        }}
+        50% {{
+            color: #fff1b0;
+            text-shadow: 0 0 2px #fff, 0 0 5px #ffcc00, 0 0 8px #ffcc00;
+        }}
+        100% {{
+            color: #e5c158;
+            text-shadow: 0 0 5px #ffcc00, 0 0 10px #ffcc00, 0 0 15px #ff9900;
+        }}
+    }}
+
+    .neon-kutu {{
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(30, 30, 35, 0.45);
         backdrop-filter: blur(8px);
         -webkit-backdrop-filter: blur(8px);
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        border-radius: 12px;
+        padding: 12px 15px;
+        margin-top: 10px;
+        margin-bottom: 20px;
         box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
     }}
 
-    .marquee-text {{
+    .neon-yazi {{
         font-size: 26px;
         font-weight: 800;
         font-style: italic;
-        color: #c5a059 !important; /* Dark Gold */
-        text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.9);
         letter-spacing: 1px;
+        animation: neonPulse 2s infinite ease-in-out;
+        text-align: center;
     }}
 
     /* SEKMELERİ ÇEVRELEYEN ARKA GÖLGELİ KUTU */
@@ -288,12 +306,10 @@ client.execute('''
     )
 ''')
 
-# 1 Kez Kayıp Ortada Duracak Saydam Gri Çerçeveli Başlık
+# Şık, Ortalanmış ve Neon Yanıp Sönen Başlık Kutusu
 st.markdown("""
-<div class="marquee-box">
-    <marquee class="marquee-text" behavior="slide" direction="left" scrollamount="8" loop="1">
-        🦪 MİDYECİ ABLA CANLI TAKİP 🦪
-    </marquee>
+<div class="neon-kutu">
+    <div class="neon-yazi">🦪 MİDYECİ ABLA CANLI TAKİP 🦪</div>
 </div>
 """, unsafe_allow_html=True)
 
