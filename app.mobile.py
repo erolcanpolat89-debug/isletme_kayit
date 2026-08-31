@@ -288,13 +288,6 @@ client.execute('''
     )
 ''')
 
-# Otomatik Sütun Güncelleme Kontrolü
-for col, dtype in [("islem_turu", "TEXT DEFAULT 'Satış'"), ("adet", "INTEGER DEFAULT 0"), ("birim_fiyat", "REAL DEFAULT 0.0")]:
-    try:
-        client.execute(f"ALTER TABLE toptan_satis ADD COLUMN {col} {dtype}")
-    except Exception:
-        pass
-
 # 1 Kez Kayıp Ortada Duracak Saydam Gri Çerçeveli Başlık
 st.markdown("""
 <div class="marquee-box">
@@ -332,7 +325,6 @@ with tab1:
             submitted = st.form_submit_button("💾 Dükkan Hareketi Kaydet")
             if submitted:
                 if tutar > 0:
-                    # Saat, dakika ve saniye bilgisini dahil ederek tam zaman damgası oluşturma
                     simdi_zaman = datetime.now().strftime("%H:%M:%S")
                     tam_tarih_saat = f"{tarih_secim.strftime('%Y-%m-%d')} {simdi_zaman}"
                     
@@ -348,7 +340,7 @@ with tab1:
 
     elif islem_modu == "📅 Tarihe Göre Bul":
         secilen_tarih = st.date_input("Filtrelenecek Tarih", datetime.now()).strftime("%Y-%m-%d")
-        df_dukkan_tarih = run_query_df("SELECT * FROM dukkan_hareket WHERE tarih LIKE ? ORDER BY id DESC", [f"{secilen_tarih}%"])
+        df_dukkan_tarih = run_query_df("SELECT * FROM dukkan_hareket WHERE SUBSTR(tarih, 1, 10) = ? ORDER BY id DESC", [secilen_tarih])
         
         if not df_dukkan_tarih.empty:
             st.dataframe(df_dukkan_tarih, use_container_width=True)
@@ -373,13 +365,13 @@ with tab1:
         secilen_kategori = st.selectbox("Kategori Filtresi", ["Tümü", "Çiğ Köfte", "Midye", "İçecek", "Dükkan Gideri", "Personel", "Diğer"])
         ekstre_tipi = st.radio("Ekstre Görünüm Modu:", ["Detaylı Ekstre (Tüm İşlemler)", "Detaysız Ekstre (Kategori Toplamları)"], horizontal=True)
         
-        # Veritabanından tarih aralığına göre verileri çekme (Tarih metin kıyaslaması)
+        # SQL Sorgusu - Tarihin ilk 10 karakterini (YYYY-MM-DD) alarak saat farkından bağımsız arama yapma
         query = "SELECT * FROM dukkan_hareket WHERE SUBSTR(tarih, 1, 10) >= ? AND SUBSTR(tarih, 1, 10) <= ?"
         params = [baslangic_tarihi, bitis_tarihi]
         
         if secilen_kategori != "Tümü":
-            query += " AND kategori = ?"
-            params.append(secilen_kategori)
+            query += " AND kategori LIKE ?"
+            params.append(f"%{secilen_kategori}%")
             
         query += " ORDER BY tarih DESC"
         df_ekstre = run_query_df(query, params)
@@ -388,7 +380,6 @@ with tab1:
         st.subheader("👁️ Canlı Ekstre Ön İzlemesi")
         
         if not df_ekstre.empty:
-            # Beyaz kağıt ön izleme alanı
             st.markdown('<div class="preview-box">', unsafe_allow_html=True)
             st.markdown(f"<h2 style='text-align: center; color: #000000;'>MİDYECİ ABLA - DÜKKAN EKSTRESİ</h2>", unsafe_allow_html=True)
             st.markdown(f"<p style='text-align: center; color: #555;'>Tarih Aralığı: <b>{baslangic_tarihi}</b> ile <b>{bitis_tarihi}</b> | Kategori: <b>{secilen_kategori}</b></p>", unsafe_allow_html=True)
@@ -400,7 +391,6 @@ with tab1:
                 toplam_tutar = df_ekstre["tutar"].sum()
                 st.markdown(f"<h3 style='text-align: right; color: #000000;'>Genel Toplam Tutar: {toplam_tutar:,.2f} TL</h3>", unsafe_allow_html=True)
             else:
-                # Detaysız: Kategori bazlı özet gruplama
                 df_ozet = df_ekstre.groupby("kategori").agg(
                     İşlem_Adedi=("id", "count"),
                     Toplam_Miktar=("miktar", "sum"),
@@ -412,8 +402,6 @@ with tab1:
                 st.markdown(f"<h3 style='text-align: right; color: #000000;'>Özet Genel Toplam: {genel_toplam:,.2f} TL</h3>", unsafe_allow_html=True)
                 
             st.markdown('</div>', unsafe_allow_html=True)
-            
-            # Yazdırma veya İndirme Butonları için Bilgi
             st.info("💡 Yukarıdaki ön izlemeyi tarayıcınızın yazdırma özelliğiyle (Ctrl + P) direkt kağıda dökebilir veya PDF olarak kaydedebilirsiniz.")
         else:
             st.warning("Belirtilen kriterlerde ve tarih aralığında herhangi bir hareket bulunamadı.")
