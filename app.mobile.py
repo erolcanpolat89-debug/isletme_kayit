@@ -37,6 +37,65 @@ st.markdown(f"""
         background: transparent !important;
     }}
 
+    /* KAYAR YAZI ÇERÇEVESİ VE MİDYECİ ABLA CANLI TAKİP BAŞLIĞI */
+    .marquee-box {{
+        background: rgba(255, 255, 255, 0.10);
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        border-radius: 12px;
+        padding: 10px 15px;
+        margin-top: 10px;
+        margin-bottom: 20px;
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    }}
+
+    .marquee-text {{
+        font-size: 26px;
+        font-weight: 800;
+        font-style: italic;
+        color: #c5a059 !important; /* Dark Gold */
+        text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.9);
+        letter-spacing: 1px;
+    }}
+
+    /* SEKMELER (TABS) DÜZENLEMESİ - DARK GOLD & BELİRGİN SEKMELER */
+    .stTabs [data-baseweb="tab-list"] {{
+        gap: 6px;
+        background: rgba(15, 23, 42, 0.70);
+        padding: 6px;
+        border-radius: 14px;
+        border: 1px solid rgba(197, 160, 89, 0.3);
+        backdrop-filter: blur(10px);
+    }}
+
+    .stTabs [data-baseweb="tab"] {{
+        background-color: rgba(255, 255, 255, 0.06);
+        border-radius: 10px;
+        padding: 8px 16px;
+        font-weight: 800 !important;
+        font-size: 15px !important;
+        color: #d4af37 !important; /* Dark Gold */
+        text-shadow: 0px 1px 3px rgba(0, 0, 0, 0.8);
+        border: 1px solid rgba(212, 175, 55, 0.2);
+        transition: all 0.3s ease;
+    }}
+
+    /* Sekme Üzerine Gelince (Hover) */
+    .stTabs [data-baseweb="tab"]:hover {{
+        background-color: rgba(197, 160, 89, 0.25);
+        color: #ffffff !important;
+        border-color: #d4af37;
+    }}
+
+    /* Seçili Sekme (Active Tab) */
+    .stTabs [aria-selected="true"] {{
+        background: linear-gradient(135deg, #c5a059, #9a7b38) !important;
+        color: #ffffff !important;
+        border-color: #f3e5ab !important;
+        box-shadow: 0 4px 12px rgba(197, 160, 89, 0.4);
+    }}
+
     /* TÜM ETIKETLER VE BAŞLIKLAR (Beyaz, Kalın ve Gölgeli) */
     .stApp, .stApp p, .stApp label, .stApp span, 
     div[data-testid="stMarkdownContainer"] p, 
@@ -78,41 +137,6 @@ st.markdown(f"""
     div[data-baseweb="select"] div {{
         color: #000000 !important;
         font-weight: 800 !important;
-    }}
-
-    /* Başlık Tasarımı */
-    .custom-title {{
-        font-size: 28px !important;
-        font-weight: 900;
-        text-align: center;
-        background: linear-gradient(90deg, #ff7e5f, #feb47b);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        margin-bottom: 20px;
-        margin-top: 10px;
-        filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.8));
-    }}
-
-    /* Sekme (Tabs) Butonları */
-    .stTabs [data-baseweb="tab-list"] {{
-        gap: 4px;
-        background: rgba(15, 23, 42, 0.4);
-        padding: 4px;
-        border-radius: 12px;
-        backdrop-filter: blur(5px);
-    }}
-
-    .stTabs [data-baseweb="tab"] {{
-        background-color: transparent;
-        border-radius: 8px;
-        padding: 6px 10px;
-        font-weight: 600;
-        color: #cbd5e1 !important;
-    }}
-
-    .stTabs [aria-selected="true"] {{
-        background: linear-gradient(135deg, #ff4b4b, #dc2626) !important;
-        color: #ffffff !important;
     }}
 
     /* Glassmorphic Kutu Alanları (Logoyu Gösterecek Şekilde Yarı Saydam) */
@@ -223,8 +247,14 @@ for col, dtype in [("islem_turu", "TEXT DEFAULT 'Satış'"), ("adet", "INTEGER D
     except Exception:
         pass
 
-# Başlık
-st.markdown('<div class="custom-title">🦪 MİDYECİ ABLA CANLI TAKİP</div>', unsafe_allow_html=True)
+# Saydam Gri Çerçeveli, Dark Gold İtalik Kayar Yazı Başlık
+st.markdown("""
+<div class="marquee-box">
+    <marquee class="marquee-text" behavior="scroll" direction="left" scrollamount="6">
+        🦪 MİDYECİ ABLA CANLI TAKİP 🦪
+    </marquee>
+</div>
+""", unsafe_allow_html=True)
 
 # Sekmeler (5 Sekmeli Yapı)
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["🏪 Dükkan", "🚚 Toptan", "🏢 Firmalar", "📊 Cari Ekstre", "💰 Borç/Alacak"])
