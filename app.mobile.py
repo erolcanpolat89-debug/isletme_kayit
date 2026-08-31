@@ -200,8 +200,10 @@ for col, dtype in [("islem_turu", "TEXT DEFAULT 'Satış'"), ("adet", "INTEGER D
     except Exception:
         pass
 
-# Başlık
-st.markdown('<div class="custom-title">🦪 MİDYECİ ABLA CANLI TAKİP</div>', unsafe_allow_html=True)
+# Başlık (GitHub'daki 1000295034.png Logosu İle)
+col_l1, col_l2, col_l3 = st.columns([1, 2, 1])
+with col_l2:
+    st.image("1000295034.png", use_container_width=True)
 
 # Sekmeler (5 Sekmeli Yapı)
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["🏪 Dükkan", "🚚 Toptan", "🏢 Firmalar", "📊 Cari Ekstre", "💰 Borç/Alacak"])
