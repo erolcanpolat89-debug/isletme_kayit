@@ -310,14 +310,6 @@ with tab1:
     
     islem_modu = st.radio("İşlem Seçin:", ["🔴 Yeni Hareket", "📅 Tarihe Göre Bul", "📈 Dükkan Ekstresi", "📋 Tüm Kayıtları Yönet"], horizontal=True)
 
-# ==========================================
-# 1. SEKME: DÜKKAN
-# ==========================================
-with tab1:
-    st.subheader("🏪 Dükkan Hareketleri & Ekstre")
-    
-    islem_modu = st.radio("İşlem Seçin:", ["🔴 Yeni Hareket", "📅 Tarihe Göre Bul", "📈 Dükkan Ekstresi", "📋 Tüm Kayıtları Yönet"], horizontal=True)
-
     if islem_modu == "🔴 Yeni Hareket":
         with st.form("dukkan_form", clear_on_submit=True):
             col1, col2 = st.columns(2)
@@ -327,31 +319,29 @@ with tab1:
                 kategori = st.selectbox("Kategori", ["Çiğ Köfte", "Midye", "İçecek", "Dükkan Gideri", "Personel", "Diğer"])
             with col2:
                 urun_adi = st.text_input("Ürün / Detay Açıklaması", placeholder="Örn: Midye Satışı veya Kira Gideri")
-                miktar = st.number_input("Miktar / Adet", min_value=1, value=10, step=1)
-                birim_fiyat = st.number_input("Birim Fiyat (TL)", min_value=0.0, value=1.75, step=0.25, format="%.2f")
-
-            # Adet ve birim fiyatı burada çarpıp anlık gösteriyoruz
-            hesaplanan_tutar = miktar * birim_fiyat
-            st.markdown(f"### 🧮 Hesaplanan Toplam Tutar: `{hesaplanan_tutar:,.2f} TL`")
+                miktar = st.number_input("Miktar / Adet", min_value=1, value=1, step=1)
+                tutar = st.number_input("Toplam Tutar (TL)", min_value=0.0, value=0.0, step=10.0)
 
             submitted = st.form_submit_button("💾 Dükkan Hareketi Kaydet")
             if submitted:
-                if hesaplanan_tutar > 0:
+                if tutar > 0:
                     simdi_zaman = datetime.now().strftime("%H:%M:%S")
                     tam_tarih_saat = f"{tarih_secim.strftime('%Y-%m-%d')} {simdi_zaman}"
                     
+                    birim_fiyat = tutar / miktar if miktar > 0 else 0
                     client.execute(
                         "INSERT INTO dukkan_hareket (tarih, islem_tipi, kategori, urun_adi, miktar, birim_fiyat, tutar) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                        [tam_tarih_saat, islem_tipi, kategori, urun_adi, miktar, birim_fiyat, hesaplanan_tutar]
+                        [tam_tarih_saat, islem_tipi, kategori, urun_adi, miktar, birim_fiyat, tutar]
                     )
-                    st.success(f"Dükkan hareketi başarıyla kaydedildi! Toplam: {hesaplanan_tutar:,.2f} TL")
+                    st.success(f"Dükkan hareketi başarıyla kaydedildi! ({tam_tarih_saat})")
                     st.rerun()
                 else:
-                    st.warning("Lütfen geçerli bir miktar ve fiyat girin!")
+                    st.warning("Lütfen geçerli bir tutar girin!")
 
         st.markdown("---")
         st.subheader("📋 Bugünün Dükkan Kayıtları")
         
+        # Sadece bugünün kayıtlarını getiren sorgu
         df_bugun_dukkan = run_query_df("SELECT * FROM dukkan_hareket WHERE SUBSTR(tarih, 1, 10) = ? ORDER BY id DESC", [bugun])
         
         if not df_bugun_dukkan.empty:
