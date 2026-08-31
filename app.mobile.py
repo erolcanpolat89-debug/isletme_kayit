@@ -11,13 +11,14 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Koyu Tema & Tarih / Detay Kutusu Metin Rengi Düzeltmesi
+# Koyu Tema & Arka Plan Logo (Filigran) Düzeltmesi
 st.markdown("""
 <style>
-    /* Arka Plan Degrade */
+    /* Arka Plana Saydam Logo ve Koyu Katman Ekleme */
     .stApp {
-        background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
-        background-attachment: fixed;
+        background: linear-gradient(rgba(15, 23, 42, 0.88), rgba(15, 23, 42, 0.88)), 
+                    url('https://raw.githubusercontent.com/erolcanpolat89-debug/main/1000295034.png') no-repeat center center fixed !important;
+        background-size: contain !important;
     }
 
     /* TÜM ETIKETLER VE BAŞLIKLAR (Beyaz ve Kalın) */
@@ -71,7 +72,7 @@ st.markdown("""
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         margin-bottom: 20px;
-        margin-top: -10px;
+        margin-top: 10px;
     }
 
     /* Sekme (Tabs) Butonları */
@@ -97,7 +98,7 @@ st.markdown("""
 
     /* Glassmorphic Kutu Alanları */
     div[data-testid="stForm"], div[data-testid="stExpander"] {
-        background: rgba(30, 41, 59, 0.95) !important;
+        background: rgba(30, 41, 59, 0.85) !important;
         border: 1px solid rgba(255, 255, 255, 0.15) !important;
         border-radius: 16px !important;
         box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
@@ -200,10 +201,8 @@ for col, dtype in [("islem_turu", "TEXT DEFAULT 'Satış'"), ("adet", "INTEGER D
     except Exception:
         pass
 
-# Başlık (GitHub'daki 1000295034.png Logosu İle)
-col_l1, col_l2, col_l3 = st.columns([1, 2, 1])
-with col_l2:
-    st.image("1000295034.png", use_container_width=True)
+# Başlık (Arka plan logolu iken şık görünüm)
+st.markdown('<div class="custom-title">🦪 MİDYECİ ABLA CANLI TAKİP</div>', unsafe_allow_html=True)
 
 # Sekmeler (5 Sekmeli Yapı)
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["🏪 Dükkan", "🚚 Toptan", "🏢 Firmalar", "📊 Cari Ekstre", "💰 Borç/Alacak"])
