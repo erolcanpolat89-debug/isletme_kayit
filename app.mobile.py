@@ -22,10 +22,10 @@ def get_base64_image(image_path):
 
 img_base64 = get_base64_image("1000295034.png")
 
-# Koyu Tema & Arka Plan Logo (Tam Ekran & Belirgin Filigran)
+# Koyu Tema & Arka Plan Logo
 st.markdown(f"""
 <style>
-    /* Ana Ekran Arka Planı (Sayfanın Tamamını Kaplayan & Belirgin Logo) */
+    /* Ana Ekran Arka Planı */
     .stApp {{
         background: linear-gradient(rgba(15, 23, 42, 0.55), rgba(15, 23, 42, 0.55)), 
                     url('data:image/png;base64,{img_base64}') no-repeat center center fixed !important;
@@ -37,7 +37,7 @@ st.markdown(f"""
         background: transparent !important;
     }}
 
-    /* KAYAR YAZI ÇERÇEVESİ VE MİDYECİ ABLA CANLI TAKİP BAŞLIĞI */
+    /* SAYDAM GRİ GÖLGELİ KUTU (Kayar Yazı İçin) */
     .marquee-box {{
         background: rgba(255, 255, 255, 0.10);
         border: 1px solid rgba(255, 255, 255, 0.25);
@@ -47,7 +47,7 @@ st.markdown(f"""
         margin-bottom: 20px;
         backdrop-filter: blur(8px);
         -webkit-backdrop-filter: blur(8px);
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
     }}
 
     .marquee-text {{
@@ -59,44 +59,54 @@ st.markdown(f"""
         letter-spacing: 1px;
     }}
 
-    /* SEKMELER (TABS) DÜZENLEMESİ - DARK GOLD & BELİRGİN SEKMELER */
+    /* SEKMELERİ ÇEVRELEYEN ARKA GÖLGELİ KUTU */
     .stTabs [data-baseweb="tab-list"] {{
         gap: 6px;
-        background: rgba(15, 23, 42, 0.70);
-        padding: 6px;
-        border-radius: 14px;
-        border: 1px solid rgba(197, 160, 89, 0.3);
-        backdrop-filter: blur(10px);
+        background: rgba(255, 255, 255, 0.10) !important;
+        border: 1px solid rgba(255, 255, 255, 0.25) !important;
+        border-radius: 12px !important;
+        padding: 8px !important;
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4) !important;
     }}
 
+    /* SEKMELERİN KENDİSİ VE DARK GOLD YAZILAR */
     .stTabs [data-baseweb="tab"] {{
-        background-color: rgba(255, 255, 255, 0.06);
-        border-radius: 10px;
-        padding: 8px 16px;
+        background-color: rgba(0, 0, 0, 0.25) !important;
+        border-radius: 8px !important;
+        padding: 8px 16px !important;
         font-weight: 800 !important;
         font-size: 15px !important;
-        color: #d4af37 !important; /* Dark Gold */
-        text-shadow: 0px 1px 3px rgba(0, 0, 0, 0.8);
-        border: 1px solid rgba(212, 175, 55, 0.2);
+        color: #c5a059 !important; /* Dark Gold */
+        text-shadow: 0px 1px 3px rgba(0, 0, 0, 0.9);
+        border: 1px solid rgba(197, 160, 89, 0.3) !important;
         transition: all 0.3s ease;
     }}
 
-    /* Sekme Üzerine Gelince (Hover) */
+    .stTabs [data-baseweb="tab"] * {{
+        color: #c5a059 !important;
+        font-weight: 800 !important;
+    }}
+
+    /* Sekme Hover */
     .stTabs [data-baseweb="tab"]:hover {{
-        background-color: rgba(197, 160, 89, 0.25);
-        color: #ffffff !important;
-        border-color: #d4af37;
+        background-color: rgba(197, 160, 89, 0.25) !important;
+        border-color: #c5a059 !important;
     }}
 
     /* Seçili Sekme (Active Tab) */
     .stTabs [aria-selected="true"] {{
-        background: linear-gradient(135deg, #c5a059, #9a7b38) !important;
-        color: #ffffff !important;
+        background: linear-gradient(135deg, #c5a059, #8a6d29) !important;
         border-color: #f3e5ab !important;
-        box-shadow: 0 4px 12px rgba(197, 160, 89, 0.4);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5) !important;
     }}
 
-    /* TÜM ETIKETLER VE BAŞLIKLAR (Beyaz, Kalın ve Gölgeli) */
+    .stTabs [aria-selected="true"] * {{
+        color: #ffffff !important;
+    }}
+
+    /* TÜM ETIKETLER VE BAŞLIKLAR */
     .stApp, .stApp p, .stApp label, .stApp span, 
     div[data-testid="stMarkdownContainer"] p, 
     label[data-testid="stWidgetLabel"] p {{
@@ -111,7 +121,7 @@ st.markdown(f"""
         color: #ffffff !important;
     }}
 
-    /* TARİH, DETAY VE TÜM INPUT KUTULARININ İÇİ (Koyu Siyah Yazı) */
+    /* TARİH VE INPUT KUTULARI */
     div[data-baseweb="input"] input, 
     div[data-baseweb="base-input"] input,
     div[data-testid="stTextInput"] input,
@@ -125,7 +135,6 @@ st.markdown(f"""
         opacity: 1 !important;
     }}
 
-    /* Kutuların Arka Planı (Tam Beyaz) */
     div[data-baseweb="input"], 
     div[data-baseweb="base-input"],
     div[data-baseweb="select"] {{
@@ -133,13 +142,12 @@ st.markdown(f"""
         border-radius: 10px !important;
     }}
 
-    /* Selectbox (Açılır Menü) Seçilen Yazı Rengi */
     div[data-baseweb="select"] div {{
         color: #000000 !important;
         font-weight: 800 !important;
     }}
 
-    /* Glassmorphic Kutu Alanları (Logoyu Gösterecek Şekilde Yarı Saydam) */
+    /* Glassmorphic Form Kutu Alanları */
     div[data-testid="stForm"], div[data-testid="stExpander"] {{
         background: rgba(15, 23, 42, 0.45) !important;
         backdrop-filter: blur(8px);
@@ -247,16 +255,16 @@ for col, dtype in [("islem_turu", "TEXT DEFAULT 'Satış'"), ("adet", "INTEGER D
     except Exception:
         pass
 
-# Saydam Gri Çerçeveli, Dark Gold İtalik Kayar Yazı Başlık
+# 1 Kez Kayıp Ortada Duracak Saydam Gri Çerçeveli Başlık
 st.markdown("""
 <div class="marquee-box">
-    <marquee class="marquee-text" behavior="scroll" direction="left" scrollamount="6">
+    <marquee class="marquee-text" behavior="slide" direction="left" scrollamount="8" loop="1">
         🦪 MİDYECİ ABLA CANLI TAKİP 🦪
     </marquee>
 </div>
 """, unsafe_allow_html=True)
 
-# Sekmeler (5 Sekmeli Yapı)
+# Sekmeler (5 Sekmeli Yapı - Arka Gölgeli Kutu İçinde Dark Gold Metinler)
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["🏪 Dükkan", "🚚 Toptan", "🏢 Firmalar", "📊 Cari Ekstre", "💰 Borç/Alacak"])
 
 bugun = datetime.now().strftime("%Y-%m-%d")
