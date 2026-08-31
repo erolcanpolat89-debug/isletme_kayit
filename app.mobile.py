@@ -1,4 +1,375 @@
-elif islem_modu == "📅 Tarihe Göre Bul":
+
+import streamlit as st
+import pandas as pd
+from datetime import datetime
+import libsql_client as libsql
+import base64
+
+# Sayfa Ayarları
+st.set_page_config(
+    page_title="Midyeci Abla Canlı Takip",
+    page_icon="🦪",
+    layout="centered",
+    initial_sidebar_state="collapsed"
+)
+
+# Yerel PNG Dosyasını Base64 Formatına Çevirme
+def get_base64_image(image_path):
+    try:
+        with open(image_path, "rb") as img_file:
+            return base64.b64encode(img_file.read()).decode()
+    except Exception:
+        return ""
+
+img_base64 = get_base64_image("1000295034.png")
+
+# Koyu Tema & Arka Plan Logo
+st.markdown(f"""
+<style>
+    /* Ana Ekran Arka Planı */
+    .stApp {{
+        background: linear-gradient(rgba(15, 23, 42, 0.55), rgba(15, 23, 42, 0.55)), 
+                    url('data:image/png;base64,{img_base64}') no-repeat center center fixed !important;
+        background-size: cover !important;
+    }}
+
+    /* Streamlit Üst Çubuk Transparent Yapma */
+    header, [data-testid="stHeader"], [data-testid="stToolbar"] {{
+        background: transparent !important;
+    }}
+
+    /* SAYDAM GRİ GÖLGELİ KUTU (Kayar Yazı İçin) */
+    .marquee-box {{
+        background: rgba(255, 255, 255, 0.10);
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        border-radius: 12px;
+        padding: 10px 15px;
+        margin-top: 10px;
+        margin-bottom: 20px;
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+    }}
+
+    .marquee-text {{
+        font-size: 26px;
+        font-weight: 800;
+        font-style: italic;
+        color: #c5a059 !important; /* Dark Gold */
+        text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.9);
+        letter-spacing: 1px;
+    }}
+
+    /* SEKMELERİ ÇEVRELEYEN ARKA GÖLGELİ KUTU */
+    .stTabs [data-baseweb="tab-list"] {{
+        gap: 6px;
+        background: rgba(255, 255, 255, 0.10) !important;
+        border: 1px solid rgba(255, 255, 255, 0.25) !important;
+        border-radius: 12px !important;
+        padding: 8px !important;
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4) !important;
+    }}
+
+    /* SEKMELERİN KENDİSİ VE DARK GOLD YAZILAR */
+    .stTabs [data-baseweb="tab"] {{
+        background-color: rgba(0, 0, 0, 0.25) !important;
+        border-radius: 8px !important;
+        padding: 8px 16px !important;
+        font-weight: 800 !important;
+        font-size: 15px !important;
+        color: #c5a059 !important; /* Dark Gold */
+        text-shadow: 0px 1px 3px rgba(0, 0, 0, 0.9);
+        border: 1px solid rgba(197, 160, 89, 0.3) !important;
+        position: relative;
+        transition: all 0.3s ease;
+    }}
+
+    .stTabs [data-baseweb="tab"] * {{
+        color: #c5a059 !important;
+        font-weight: 800 !important;
+    }}
+
+    /* SEKME ÜZERİNE GELİNCE (HOVER) - IŞIK YANSIMASI VE ALT PARLAMA ÇİZGİSİ */
+    .stTabs [data-baseweb="tab"]:hover {{
+        background-color: rgba(197, 160, 89, 0.25) !important;
+        border-color: #c5a059 !important;
+        box-shadow: 0 6px 20px rgba(197, 160, 89, 0.4), inset 0 0 10px rgba(255, 255, 255, 0.2) !important;
+        transform: translateY(-2px);
+    }}
+
+    .stTabs [data-baseweb="tab"]:hover::after {{
+        content: '';
+        position: absolute;
+        bottom: -4px;
+        left: 10%;
+        width: 80%;
+        height: 3px;
+        background: linear-gradient(90deg, transparent, #f3e5ab, transparent);
+        box-shadow: 0 0 8px #d4af37;
+        border-radius: 2px;
+    }}
+
+    /* Seçili Sekme (Active Tab) */
+    .stTabs [aria-selected="true"] {{
+        background: linear-gradient(135deg, #c5a059, #8a6d29) !important;
+        border-color: #f3e5ab !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5) !important;
+        transform: translateY(0px);
+    }}
+
+    .stTabs [aria-selected="true"] * {{
+        color: #ffffff !important;
+    }}
+
+    .stTabs [aria-selected="true"]::after {{
+        content: '';
+        position: absolute;
+        bottom: -4px;
+        left: 5%;
+        width: 90%;
+        height: 3px;
+        background: #ffffff;
+        box-shadow: 0 0 10px #ffffff, 0 0 15px #d4af37;
+        border-radius: 2px;
+    }}
+
+    /* TÜM ETIKETLER VE BAŞLIKLAR */
+    .stApp, .stApp p, .stApp label, .stApp span, 
+    div[data-testid="stMarkdownContainer"] p, 
+    label[data-testid="stWidgetLabel"] p {{
+        color: #ffffff !important;
+        font-weight: 700 !important;
+        opacity: 1 !important;
+        text-shadow: 0px 1px 4px rgba(0, 0, 0, 0.9);
+    }}
+
+    div[role="radiogroup"] label div[data-testid="stMarkdownContainer"] p {{
+        color: #ffffff !important;
+    }}
+
+    /* TARİH VE INPUT KUTULARI */
+    div[data-baseweb="input"] input, 
+    div[data-baseweb="base-input"] input,
+    div[data-testid="stTextInput"] input,
+    div[data-testid="stDateInput"] input,
+    input[type="text"], 
+    input[type="number"] {{
+        color: #000000 !important;
+        -webkit-text-fill-color: #000000 !important;
+        font-weight: 800 !important;
+        background-color: #ffffff !important;
+        opacity: 1 !important;
+    }}
+
+    div[data-baseweb="input"], 
+    div[data-baseweb="base-input"],
+    div[data-baseweb="select"] {{
+        background-color: #ffffff !important;
+        border-radius: 10px !important;
+    }}
+
+    div[data-baseweb="select"] div {{
+        color: #000000 !important;
+        font-weight: 800 !important;
+    }}
+
+    /* Glassmorphic Form Kutu Alanları */
+    div[data-testid="stForm"], div[data-testid="stExpander"] {{
+        background: rgba(15, 23, 42, 0.45) !important;
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        border: 1px solid rgba(255, 255, 255, 0.2) !important;
+        border-radius: 16px !important;
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+        padding: 18px !important;
+    }}
+
+    /* Kaydet Butonları */
+    div.stButton > button, div.stFormSubmitButton > button {{
+        width: 100% !important;
+        height: 50px !important;
+        font-size: 16px !important;
+        font-weight: 700 !important;
+        border-radius: 12px !important;
+        background: linear-gradient(135deg, #ff4b4b, #ef4444) !important;
+        color: white !important;
+        border: none !important;
+        box-shadow: 0 4px 14px rgba(239, 68, 68, 0.4);
+    }}
+
+    /* Ön İzleme Yazdırma Kağıdı Tasarımı */
+    .preview-box {{
+        background: #ffffff !important;
+        color: #000000 !important;
+        padding: 25px;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    }}
+    .preview-box * {{
+        color: #000000 !important;
+        text-shadow: none !important;
+    }}
+
+    /* Metrik Kartları */
+    div[data-testid="stMetric"] {{
+        background: rgba(15, 23, 42, 0.45);
+        backdrop-filter: blur(6px);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 14px;
+        padding: 12px 16px;
+    }}
+
+    div[data-testid="stMetricValue"] {{
+        font-size: 24px !important;
+        font-weight: 800 !important;
+        color: #ff6b6b !important;
+    }}
+
+    div[data-testid="stMetricLabel"] {{
+        color: #cbd5e1 !important;
+    }}
+</style>
+""", unsafe_allow_html=True)
+
+# Turso Bulut Veritabanı Bağlantı Fonksiyonu
+def get_client():
+    url = st.secrets["TURSO_DATABASE_URL"]
+    if url.startswith("libsql://"):
+        url = url.replace("libsql://", "https://")
+    elif url.startswith("wss://"):
+        url = url.replace("wss://", "https://")
+        
+    token = st.secrets["TURSO_AUTH_TOKEN"]
+    return libsql.create_client_sync(url=url, auth_token=token)
+
+client = get_client()
+
+# Yardımcı Fonksiyon: Libsql Sonucunu Pandas Dataframe'e Çevirir
+def run_query_df(query, params=None):
+    res = client.execute(query, params or [])
+    columns = res.columns
+    rows = res.rows
+    return pd.DataFrame(rows, columns=columns)
+
+# Tabloları Oluşturma
+client.execute('''
+    CREATE TABLE IF NOT EXISTS firmalar (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        firma_adi TEXT UNIQUE,
+        telefon TEXT,
+        aciklama TEXT
+    )
+''')
+
+client.execute('''
+    CREATE TABLE IF NOT EXISTS toptan_satis (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        firma_adi TEXT,
+        tarih TEXT,
+        islem_turu TEXT DEFAULT 'Satış',
+        adet INTEGER DEFAULT 0,
+        birim_fiyat REAL DEFAULT 0.0,
+        toplam_tutar REAL,
+        aciklama TEXT
+    )
+''')
+
+client.execute('''
+    CREATE TABLE IF NOT EXISTS dukkan_hareket (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tarih TEXT,
+        islem_tipi TEXT,
+        kategori TEXT,
+        urun_adi TEXT,
+        miktarı INTEGER,
+        birim_fiyat REAL,
+        tutar REAL
+    )
+''')
+
+# Başlık Kutusu
+st.markdown("""
+<div class="marquee-box">
+    <marquee class="marquee-text" behavior="slide" direction="left" scrollamount="8" loop="1">
+        🦪 MİDYECİ ABLA CANLI TAKİP 🦪
+    </marquee>
+</div>
+""", unsafe_allow_html=True)
+
+# Sekmeler (5 Sekmeli Yapı)
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["🏪 Dükkan", "🚚 Toptan", "🏢 Firmalar", "📊 Cari Ekstre", "💰 Borç/Alacak"])
+
+bugun = datetime.now().strftime("%Y-%m-%d")
+
+# ==========================================
+# 1. SEKME: DÜKKAN
+# ==========================================
+with tab1:
+    st.subheader("🏪 Dükkan Hareketleri & Ekstre")
+    
+    # Hafıza için Session State Tanımlamaları
+    if "son_birim_fiyat" not in st.session_state:
+        st.session_state.son_birim_fiyat = 1.75
+    if "son_kategori" not in st.session_state:
+        st.session_state.son_kategori = "Midye"
+
+    islem_modu = st.radio("İşlem Seçin:", ["🔴 Yeni Hareket", "📅 Tarihe Göre Bul", "📈 Dükkan Ekstresi", "📋 Tüm Kayıtları Yönet"], horizontal=True)
+
+    if islem_modu == "🔴 Yeni Hareket":
+        with st.form("dukkan_form", clear_on_submit=True):
+            col1, col2 = st.columns(2)
+            with col1:
+                islem_tipi = st.selectbox("İşlem Tipi", ["Günlük Satış (Gelir)", "Dükkan Gideri (Gider)"])
+                tarih_secim = st.date_input("Tarih", datetime.now())
+                
+                kat_listesi = ["Midye", "Çiğ Köfte", "İçecek", "Dükkan Gideri", "Personel", "Diğer"]
+                # Son seçilen kategoriyi listede bulup varsayılan index yapalım
+                default_kat_idx = kat_listesi.index(st.session_state.son_kategori) if st.session_state.son_kategori in kat_listesi else 0
+                kategori = st.selectbox("Kategori", kat_listesi, index=default_kat_idx)
+                
+            with col2:
+                urun_adi = st.text_input("Ürün / Detay Açıklaması", placeholder="Örn: Midye Satışı veya Kira Gideri")
+                miktar = st.number_input("Miktar / Adet", min_value=1, value=10, step=1)
+                
+                # Hafızadaki son birim fiyatı otomatik getir
+                birim_fiyat = st.number_input("Birim Fiyat (TL)", min_value=0.0, value=float(st.session_state.son_birim_fiyat), step=0.25, format="%.2f")
+
+            # Otomatik Çarpım Hesaplaması ve Gösterimi
+            hesaplanan_tutar = miktar * birim_fiyat
+            st.markdown(f"**Hesaplanan Toplam Tutar:** `### {hesaplanan_tutar:,.2f} TL`")
+
+            submitted = st.form_submit_button("💾 Dükkan Hareketi Kaydet")
+            if submitted:
+                if miktar > 0 and birim_fiyat > 0:
+                    # Değerleri hafızaya al
+                    st.session_state.son_birim_fiyat = birim_fiyat
+                    st.session_state.son_kategori = kategori
+                    
+                    simdi_zaman = datetime.now().strftime("%H:%M:%S")
+                    tam_tarih_saat = f"{tarih_secim.strftime('%Y-%m-%d')} {simdi_zaman}"
+                    
+                    client.execute(
+                        "INSERT INTO dukkan_hareket (tarih, islem_tipi, kategori, urun_adi, miktar, birim_fiyat, tutar) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                        [tam_tarih_saat, islem_tipi, kategori, urun_adi, miktar, birim_fiyat, hesaplanan_tutar]
+                    )
+                    st.success(f"Dükkan hareketi başarıyla kaydedildi! ({tam_tarih_saat}) - Toplam: {hesaplanan_tutar:,.2f} TL")
+                    st.rerun()
+                else:
+                    st.warning("Lütfen miktar ve birim fiyatı sıfırdan büyük girin!")
+
+        st.markdown("---")
+        st.subheader("📋 Bugünün Dükkan Kayıtları")
+        
+        df_bugun_dukkan = run_query_df("SELECT * FROM dukkan_hareket WHERE SUBSTR(tarih, 1, 10) = ? ORDER BY id DESC", [bugun])
+        
+        if not df_bugun_dukkan.empty:
+            st.dataframe(df_bugun_dukkan, use_container_width=True)
+        else:
+            st.info("Bugüne ait henüz dükkan hareketi kaydedilmedi.")
+
+     elif islem_modu == "📅 Tarihe Göre Bul":
         secilen_tarih = st.date_input("Filtrelenecek Tarih", datetime.now()).strftime("%Y-%m-%d")
         df_dukkan_tarih = run_query_df("SELECT * FROM dukkan_hareket WHERE SUBSTR(tarih, 1, 10) = ? ORDER BY id DESC", [secilen_tarih])
         
@@ -45,6 +416,17 @@ elif islem_modu == "📅 Tarihe Göre Bul":
             st.markdown("<hr>", unsafe_allow_html=True)
             
             if ekstre_tipi == "Detaylı Ekstre (Tüm İşlemler)":
+                st.dataframe(df_ekstre, use_container_width=True)
+            else:
+                df_ozet = df_ekstre.groupby("kategori")["tutar"].sum().reset_index()
+                st.dataframe(df_ozet, use_container_width=True)
+                
+            toplam_tutar_ekstre = df_ekstre["tutar"].sum()
+            st.markdown(f"<h3 style='text-align: right; color: #000000;'>Toplam Tutar: {toplam_tutar_ekstre:,.2f} TL</h3>", unsafe_allow_html=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+        else:
+            st.info("Seçilen kriterlere uygun dükkan hareketi bulunamadı.")
+            if ekstre_tipi == "Detaylı Ekstre (Tüm İşlemler)":
                 st.write(f"Toplam İşlem Adedi: **{len(df_ekstre)}**")
                 st.dataframe(df_ekstre, use_container_width=True)
                 toplam_tutar = df_ekstre["tutar"].sum()
@@ -66,6 +448,16 @@ elif islem_modu == "📅 Tarihe Göre Bul":
             st.warning("Belirtilen kriterlerde ve tarih aralığında herhangi bir hareket bulunamadı.")
 
     elif islem_modu == "📋 Tüm Kayıtları Yönet":
+        df_tum_dukkan = run_query_df("SELECT * FROM dukkan_hareket ORDER BY id DESC")
+        st.dataframe(df_tum_dukkan, use_container_width=True)
+        
+        silinecek_id = st.number_input("Silinecek Kayıt ID", min_value=1, step=1)
+        if st.button("🗑️ Seçili Kaydı Sil"):
+            client.execute("DELETE FROM dukkan_hareket WHERE id = ?", [silinecek_id])
+            st.success(f"ID: {silinecek_id} olan kayıt silindi.")
+            st.rerun()
+
+    else:
         st.subheader("Tüm Dükkan Kayıtlarını Yönet")
         df_dukkan_all = run_query_df("SELECT id, tarih, islem_tipi, kategori, urun_adi, miktar, birim_fiyat, tutar FROM dukkan_hareket ORDER BY id DESC")
         
@@ -75,16 +467,16 @@ elif islem_modu == "📅 Tarihe Göre Bul":
                                         format_func=lambda x: f"ID:{x} - {df_dukkan_all[df_dukkan_all['id']==x]['tarih'].values[0]} - {df_dukkan_all[df_dukkan_all['id']==x]['kategori'].values[0]} ({df_dukkan_all[df_dukkan_all['id']==x]['tutar'].values[0]} TL)")
             
             kayit_d = df_dukkan_all[df_dukkan_all["id"] == secilen_d_id].iloc[0]
-            kat_list = ["Midye", "Çiğ Köfte", "İçecek", "Dükkan Gideri", "Personel", "Diğer"]
-            tip_list = ["Günlük Satış (Gelir)", "Dükkan Gideri (Gider)"]
+            kat_list = ["Midye Dolma", "Çiğ Köfte", "İçecek", "Dükkan Genel Gider", "Diğer"]
+            tip_list = ["Günlük Satış (Gelir)", "Gider (Harcama)", "Stok Girişi"]
             
             with st.form("dukkan_duzenle_form"):
                 e_tip = st.selectbox("İşlem Tipi", tip_list, index=tip_list.index(kayit_d["islem_tipi"]) if kayit_d["islem_tipi"] in tip_list else 0)
-                e_tarih_d = st.date_input("Tarih", datetime.strptime(str(kayit_d["tarih"])[:10], "%Y-%m-%d"))
+                e_tarih_d = st.date_input("Tarih", datetime.strptime(str(kayit_d["tarih"]), "%Y-%m-%d"))
                 e_kat = st.selectbox("Kategori", kat_list, index=kat_list.index(kayit_d["kategori"]) if kayit_d["kategori"] in kat_list else 0)
                 e_urun = st.text_input("Ürün / Detay", value=str(kayit_d["urun_adi"]) if kayit_d["urun_adi"] else "")
                 e_m = st.number_input("Miktar", min_value=1, step=1, value=int(kayit_d["miktar"]))
-                e_f = st.number_input("Birim Fiyat (TL)", min_value=0.0, step=0.25, value=float(kayit_d["birim_fiyat"]), format="%.2f")
+                e_f = st.number_input("Birim Fiyat (TL)", min_value=0.0, step=0.5, value=float(kayit_d["birim_fiyat"]), format="%.2f")
                 
                 e_toplam_d = e_m * e_f
                 st.info(f"Yeni Toplam: **{e_toplam_d:,.2f} TL**")
@@ -93,13 +485,11 @@ elif islem_modu == "📅 Tarihe Göre Bul":
                 sil_d = st.form_submit_button("🗑️ Sil")
                 
                 if guncelle_d:
-                    simdi_zaman = datetime.now().strftime("%H:%M:%S")
-                    tam_tarih_saat = f"{e_tarih_d.strftime('%Y-%m-%d')} {simdi_zaman}"
                     client.execute("""
                         UPDATE dukkan_hareket 
                         SET tarih=?, islem_tipi=?, kategori=?, urun_adi=?, miktar=?, birim_fiyat=?, tutar=? 
                         WHERE id=?
-                    """, [tam_tarih_saat, e_tip, e_kat, e_urun, e_m, e_f, e_toplam_d, int(secilen_d_id)])
+                    """, [e_tarih_d.strftime("%Y-%m-%d"), e_tip, e_kat, e_urun, e_m, e_f, e_toplam_d, int(secilen_d_id)])
                     st.success("Kayıt güncellendi!")
                     st.rerun()
                     
@@ -107,10 +497,9 @@ elif islem_modu == "📅 Tarihe Göre Bul":
                     client.execute("DELETE FROM dukkan_hareket WHERE id=?", [int(secilen_d_id)])
                     st.warning("Kayıt silindi!")
                     st.rerun()
-        else:
-            st.info("Yönetilebilecek dükkan kaydı bulunamadı.")
 
     st.divider()
+    
     # Günlük Özet
     df_dukkan_bugun = run_query_df("""
         SELECT SUM(miktar) as adet, SUM(tutar) as ciro 
