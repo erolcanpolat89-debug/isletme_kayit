@@ -338,6 +338,17 @@ with tab1:
                 else:
                     st.warning("Lütfen geçerli bir tutar girin!")
 
+        st.markdown("---")
+        st.subheader("📋 Bugünün Dükkan Kayıtları")
+        
+        # Sadece bugünün kayıtlarını getiren sorgu
+        df_bugun_dukkan = run_query_df("SELECT * FROM dukkan_hareket WHERE SUBSTR(tarih, 1, 10) = ? ORDER BY id DESC", [bugun])
+        
+        if not df_bugun_dukkan.empty:
+            st.dataframe(df_bugun_dukkan, use_container_width=True)
+        else:
+            st.info("Bugüne ait henüz dükkan hareketi kaydedilmedi.")
+
     elif islem_modu == "📅 Tarihe Göre Bul":
         secilen_tarih = st.date_input("Filtrelenecek Tarih", datetime.now()).strftime("%Y-%m-%d")
         df_dukkan_tarih = run_query_df("SELECT * FROM dukkan_hareket WHERE SUBSTR(tarih, 1, 10) = ? ORDER BY id DESC", [secilen_tarih])
@@ -365,7 +376,6 @@ with tab1:
         secilen_kategori = st.selectbox("Kategori Filtresi", ["Tümü", "Çiğ Köfte", "Midye", "İçecek", "Dükkan Gideri", "Personel", "Diğer"])
         ekstre_tipi = st.radio("Ekstre Görünüm Modu:", ["Detaylı Ekstre (Tüm İşlemler)", "Detaysız Ekstre (Kategori Toplamları)"], horizontal=True)
         
-        # SQL Sorgusu - Tarihin ilk 10 karakterini (YYYY-MM-DD) alarak saat farkından bağımsız arama yapma
         query = "SELECT * FROM dukkan_hareket WHERE SUBSTR(tarih, 1, 10) >= ? AND SUBSTR(tarih, 1, 10) <= ?"
         params = [baslangic_tarihi, bitis_tarihi]
         
