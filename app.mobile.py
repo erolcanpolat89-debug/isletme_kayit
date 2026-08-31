@@ -368,11 +368,20 @@ with tab1:
         else:
             st.info("Bugüne ait henüz dükkan hareketi kaydedilmedi.")
 
-     elif islem_modu == "📅 Tarihe Göre Bul":
+    elif islem_modu == "📅 Tarihe Göre Bul":
         secilen_tarih = st.date_input("Filtrelenecek Tarih", datetime.now()).strftime("%Y-%m-%d")
         df_dukkan_tarih = run_query_df("SELECT * FROM dukkan_hareket WHERE SUBSTR(tarih, 1, 10) = ? ORDER BY id DESC", [secilen_tarih])
         
         if not df_dukkan_tarih.empty:
+            st.dataframe(df_dukkan_tarih, use_container_width=True)
+            toplam_gelir = df_dukkan_tarih[df_dukkan_tarih["islem_tipi"] == "Günlük Satış (Gelir)"]["tutar"].sum() if "islem_tipi" in df_dukkan_tarih.columns else 0
+            toplam_gider = df_dukkan_tarih[df_dukkan_tarih["islem_tipi"] == "Dükkan Gideri (Gider)"]["tutar"].sum() if "islem_tipi" in df_dukkan_tarih.columns else 0
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Günün Geliri", f"{toplam_gelir:,.2f} TL")
+            c2.metric("Günün Gideri", f"{toplam_gider:,.2f} TL")
+            c3.metric("Net Durum", f"{(toplam_gelir - toplam_gider):,.2f} TL")
+        else:
+            st.info("Seçilen tarihe ait kayıt bulunamadı.")
             st.dataframe(df_dukkan_tarih, use_container_width=True)
             toplam_gelir = df_dukkan_tarih[df_dukkan_tarih["islem_tipi"] == "Günlük Satış (Gelir)"]["tutar"].sum() if "islem_tipi" in df_dukkan_tarih.columns else 0
             toplam_gider = df_dukkan_tarih[df_dukkan_tarih["islem_tipi"] == "Dükkan Gideri (Gider)"]["tutar"].sum() if "islem_tipi" in df_dukkan_tarih.columns else 0
