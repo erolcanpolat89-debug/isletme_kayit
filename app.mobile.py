@@ -81,6 +81,7 @@ st.markdown(f"""
         color: #c5a059 !important; /* Dark Gold */
         text-shadow: 0px 1px 3px rgba(0, 0, 0, 0.9);
         border: 1px solid rgba(197, 160, 89, 0.3) !important;
+        position: relative;
         transition: all 0.3s ease;
     }}
 
@@ -89,10 +90,25 @@ st.markdown(f"""
         font-weight: 800 !important;
     }}
 
-    /* Sekme Hover */
+    /* SEKME ÜZERİNE GELİNCE (HOVER) - IŞIK YANSIMASI VE ALT PARLAMA ÇİZGİSİ */
     .stTabs [data-baseweb="tab"]:hover {{
         background-color: rgba(197, 160, 89, 0.25) !important;
         border-color: #c5a059 !important;
+        box-shadow: 0 6px 20px rgba(197, 160, 89, 0.4), inset 0 0 10px rgba(255, 255, 255, 0.2) !important;
+        transform: translateY(-2px);
+    }}
+
+    /* Sekme Altına Zarif Işık Yansıması Efekti */
+    .stTabs [data-baseweb="tab"]:hover::after {{
+        content: '';
+        position: absolute;
+        bottom: -4px;
+        left: 10%;
+        width: 80%;
+        height: 3px;
+        background: linear-gradient(90deg, transparent, #f3e5ab, transparent);
+        box-shadow: 0 0 8px #d4af37;
+        border-radius: 2px;
     }}
 
     /* Seçili Sekme (Active Tab) */
@@ -100,10 +116,24 @@ st.markdown(f"""
         background: linear-gradient(135deg, #c5a059, #8a6d29) !important;
         border-color: #f3e5ab !important;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5) !important;
+        transform: translateY(0px);
     }}
 
     .stTabs [aria-selected="true"] * {{
         color: #ffffff !important;
+    }}
+
+    /* Seçili Sekme Altında Sabit Işık */
+    .stTabs [aria-selected="true"]::after {{
+        content: '';
+        position: absolute;
+        bottom: -4px;
+        left: 5%;
+        width: 90%;
+        height: 3px;
+        background: #ffffff;
+        box-shadow: 0 0 10px #ffffff, 0 0 15px #d4af37;
+        border-radius: 2px;
     }}
 
     /* TÜM ETIKETLER VE BAŞLIKLAR */
@@ -264,7 +294,7 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# Sekmeler (5 Sekmeli Yapı - Arka Gölgeli Kutu İçinde Dark Gold Metinler)
+# Sekmeler (5 Sekmeli Yapı)
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["🏪 Dükkan", "🚚 Toptan", "🏢 Firmalar", "📊 Cari Ekstre", "💰 Borç/Alacak"])
 
 bugun = datetime.now().strftime("%Y-%m-%d")
