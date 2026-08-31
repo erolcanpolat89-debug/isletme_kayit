@@ -311,19 +311,25 @@ with tab1:
     islem_modu = st.radio("İşlem Seçin:", ["🔴 Yeni Hareket", "📅 Tarihe Göre Bul", "📈 Dükkan Ekstresi", "📋 Tüm Kayıtları Yönet"], horizontal=True)
 
     if islem_modu == "🔴 Yeni Hareket":
-        with st.form("dukkan_form", clear_on_submit=True):
+        kategoriler = ["Midye", "Çiğ Köfte", "İçecek", "Dükkan Gideri", "Personel", "Diğer"]
+        
+        with st.form("dukkan_form", clear_on_submit=False):
             col1, col2 = st.columns(2)
             with col1:
                 islem_tipi = st.selectbox("İşlem Tipi", ["Günlük Satış (Gelir)", "Dükkan Gideri (Gider)"])
                 tarih_secim = st.date_input("Tarih", datetime.now())
-                kategori = st.selectbox("Kategori", ["Çiğ Köfte", "Midye", "İçecek", "Dükkan Gideri", "Personel", "Diğer"])
+                kategori = st.selectbox("Kategori", kategoriler, index=0)
             with col2:
                 urun_adi = st.text_input("Ürün / Detay Açıklaması", placeholder="Örn: Midye Satışı veya Kira Gideri")
                 miktar = st.number_input("Miktar / Adet", min_value=1, value=1, step=1)
-                birim_fiyat = st.number_input("Birim Fiyat (TL)", min_value=0.0, value=0.0, step=0.5, format="%.2f")
+                
+                son_fiyat_sorgu = run_query_df("SELECT birim_fiyat FROM dukkan_hareket WHERE kategori=? AND birim_fiyat > 0 ORDER BY id DESC LIMIT 1", [kategori])
+                varsayilan_fiyat = float(son_fiyat_sorgu['birim_fiyat'].iloc[0]) if not son_fiyat_sorgu.empty else 0.0
+                
+                birim_fiyat = st.number_input("Birim Fiyat (TL)", min_value=0.0, value=varsayilan_fiyat, step=0.5, format="%.2f")
 
             hesaplanan_tutar = miktar * birim_fiyat
-            st.info(f"Hesaplanan Toplam Tutar: **{hesaplanan_tutar:,.2f} TL**")
+            st.info(f"Hesaplanan Toplam Tutar: **{hesaplanan_tutar:,.2f} TL** (Seçilen kategori son fiyatı: {varsayilan_fiyat} TL)")
 
             submitted = st.form_submit_button("💾 Dükkan Hareketi Kaydet")
             if submitted:
@@ -350,6 +356,69 @@ with tab1:
             st.dataframe(df_bugun_dukkan, use_container_width=True)
         else:
             st.info("Bugüne ait henüz dükkan hareketi kaydedilmedi.")
+
+    elif islem_modu == "📅 Tarihe Göre Bul":
+        st.subheader("📅 Tarihe Göre Dükkan İşlemi Arama")
+        secilen_tarih = st.date_input("Sorgulanacak Tarih Seçin:", datetime.now(), key="dukkan_tarih_sorgu")
+        str_tarih = secilen_tarih.strftime("%Y-%m-%d")
+        
+        df_dukkan_gun = run_query_df("SELECT * FROM dukkan_hareket WHERE SUBSTR(tarih, 1, 10) = ? ORDER BY id DESC", [str_tarih])
+        
+        if df_dukkan_gun.empty:
+            st.warning(f"🔍 {str_tarih} tarihine ait dükkan kayıt bulunamadı.")
+        else:
+            st.success(f"📌 {str_tarih} Tarihindeki Kayıtlar ({len(df_dukkan_gun)} Adet)")
+            st.dataframe(df_dukkan_gun, use_container_width=True)
+
+    elif islem_modu == "📈 Dükkan Ekstresi":
+        st.subheader("📈 Dükkan Gelir / Gider Özeti")
+        df_tum_dukkan = run_query_df("SELECT islem_tipi, SUM(tutar) as toplam FROM dukkan_hareket GROUP BY islem_tipi")
+        if not df_tum_dukkan.empty:
+            st.dataframe(df_tum_dukkan, use_container_width=True)
+        else:
+            st.info("Henüz dükkan hareketi bulunmuyor.")
+
+    elif islem_modu == "📋 Tüm Kayıtları Yönet":
+        st.subheader("📋 Dükkan Kayıtlarını Düzenle / Sil")
+        df_dukkan_all = run_query_df("SELECT * FROM dukkan_hareket ORDER BY id DESC LIMIT 50")
+        
+        if df_dukkan_all.empty:
+            st.info("Düzenlenecek kayıt bulunmuyor.")
+        else:
+            secilen_dukkan_id = st.selectbox(
+                "İşlem Yapılacak Kaydı Seçin:", 
+                options=df_dukkan_all["id"], 
+                format_func=lambda x: f"ID:{x} - {df_dukkan_all[df_dukkan_all['id']==x]['tarih'].values[0]} | {df_dukkan_all[df_dukkan_all['id']==x]['kategori'].values[0]} ({df_dukkan_all[df_dukkan_all['id']==x]['tutar'].values[0]} TL)"
+            )
+            
+            dukkan_kayit = df_dukkan_all[df_dukkan_all["id"] == secilen_dukkan_id].iloc[0]
+            kategoriler = ["Midye", "Çiğ Köfte", "İçecek", "Dükkan Gideri", "Personel", "Diğer"]
+            
+            with st.form("dukkan_duzenle_form"):
+                e_islem_tipi = st.selectbox("İşlem Tipi", ["Günlük Satış (Gelir)", "Dükkan Gideri (Gider)"], index=0 if dukkan_kayit["islem_tipi"] == "Günlük Satış (Gelir)" else 1)
+                e_kategori = st.selectbox("Kategori", kategoriler, index=kategoriler.index(dukkan_kayit["kategori"]) if dukkan_kayit["kategori"] in kategoriler else 0)
+                e_urun = st.text_input("Ürün / Detay Açıklaması", value=str(dukkan_kayit["urun_adi"]) if pd.notnull(dukkan_kayit["urun_adi"]) else "")
+                e_miktar = st.number_input("Miktar / Adet", min_value=1, value=int(dukkan_kayit["miktar"]), step=1)
+                e_birim = st.number_input("Birim Fiyat (TL)", min_value=0.0, value=float(dukkan_kayit["birim_fiyat"]), step=0.5, format="%.2f")
+                
+                e_hesaplanan_tutar = e_miktar * e_birim
+                st.info(f"Güncellenecek Toplam Tutar: **{e_hesaplanan_tutar:,.2f} TL**")
+                
+                d_guncelle = st.form_submit_button("✏️ Kaydı Güncelle", type="primary")
+                d_sil = st.form_submit_button("🗑️ Kaydı Sil")
+                
+                if d_guncelle:
+                    client.execute(
+                        "UPDATE dukkan_hareket SET islem_tipi=?, kategori=?, urun_adi=?, miktar=?, birim_fiyat=?, tutar=? WHERE id=?",
+                        [e_islem_tipi, e_kategori, e_urun, e_miktar, e_birim, e_hesaplanan_tutar, int(secilen_dukkan_id)]
+                    )
+                    st.success("Kayıt başarıyla güncellendi!")
+                    st.rerun()
+                    
+                if d_sil:
+                    client.execute("DELETE FROM dukkan_hareket WHERE id=?", [int(secilen_dukkan_id)])
+                    st.warning("Kayıt silindi!")
+                    st.rerun()
 
     elif islem_modu == "📅 Tarihe Göre Bul":
         secilen_tarih = st.date_input("Filtrelenecek Tarih", datetime.now()).strftime("%Y-%m-%d")
