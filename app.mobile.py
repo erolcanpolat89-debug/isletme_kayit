@@ -22,14 +22,14 @@ def get_base64_image(image_path):
 
 img_base64 = get_base64_image("1000295034.png")
 
-# Koyu Tema & Arka Plan Logo (Filigran)
+# Koyu Tema & Arka Plan Logo (Tam Ekran & Belirgin Filigran)
 st.markdown(f"""
 <style>
-    /* Ana Ekran Arka Planı (Base64 Logo ile) */
+    /* Ana Ekran Arka Planı (Sayfanın Tamamını Kaplayan & Belirgin Logo) */
     .stApp {{
-        background: linear-gradient(rgba(15, 23, 42, 0.85), rgba(15, 23, 42, 0.85)), 
+        background: linear-gradient(rgba(15, 23, 42, 0.55), rgba(15, 23, 42, 0.55)), 
                     url('data:image/png;base64,{img_base64}') no-repeat center center fixed !important;
-        background-size: min(80vw, 450px) auto !important;
+        background-size: cover !important;
     }}
 
     /* Streamlit Üst Çubuk Transparent Yapma */
@@ -37,13 +37,14 @@ st.markdown(f"""
         background: transparent !important;
     }}
 
-    /* TÜM ETIKETLER VE BAŞLIKLAR (Beyaz ve Kalın) */
+    /* TÜM ETIKETLER VE BAŞLIKLAR (Beyaz, Kalın ve Gölgeli) */
     .stApp, .stApp p, .stApp label, .stApp span, 
     div[data-testid="stMarkdownContainer"] p, 
     label[data-testid="stWidgetLabel"] p {{
         color: #ffffff !important;
         font-weight: 700 !important;
         opacity: 1 !important;
+        text-shadow: 0px 1px 4px rgba(0, 0, 0, 0.9);
     }}
 
     /* Radio (Seçenek) Buton Metinleri */
@@ -81,7 +82,7 @@ st.markdown(f"""
 
     /* Başlık Tasarımı */
     .custom-title {{
-        font-size: 26px !important;
+        font-size: 28px !important;
         font-weight: 900;
         text-align: center;
         background: linear-gradient(90deg, #ff7e5f, #feb47b);
@@ -89,14 +90,16 @@ st.markdown(f"""
         -webkit-text-fill-color: transparent;
         margin-bottom: 20px;
         margin-top: 10px;
+        filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.8));
     }}
 
     /* Sekme (Tabs) Butonları */
     .stTabs [data-baseweb="tab-list"] {{
         gap: 4px;
-        background: rgba(255, 255, 255, 0.08);
+        background: rgba(15, 23, 42, 0.4);
         padding: 4px;
         border-radius: 12px;
+        backdrop-filter: blur(5px);
     }}
 
     .stTabs [data-baseweb="tab"] {{
@@ -112,10 +115,12 @@ st.markdown(f"""
         color: #ffffff !important;
     }}
 
-    /* Glassmorphic Kutu Alanları */
+    /* Glassmorphic Kutu Alanları (Logoyu Gösterecek Şekilde Yarı Saydam) */
     div[data-testid="stForm"], div[data-testid="stExpander"] {{
-        background: rgba(30, 41, 59, 0.75) !important;
-        border: 1px solid rgba(255, 255, 255, 0.15) !important;
+        background: rgba(15, 23, 42, 0.45) !important;
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        border: 1px solid rgba(255, 255, 255, 0.2) !important;
         border-radius: 16px !important;
         box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
         padding: 18px !important;
@@ -136,8 +141,9 @@ st.markdown(f"""
 
     /* Metrik Kartları */
     div[data-testid="stMetric"] {{
-        background: rgba(255, 255, 255, 0.05);
-        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(15, 23, 42, 0.45);
+        backdrop-filter: blur(6px);
+        border: 1px solid rgba(255, 255, 255, 0.15);
         border-radius: 14px;
         padding: 12px 16px;
     }}
