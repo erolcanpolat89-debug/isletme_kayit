@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 import libsql_client as libsql
+import io
 
 # Sayfa Ayarları
 st.set_page_config(
@@ -42,7 +43,7 @@ st.markdown("""
     input[type="text"], 
     input[type="number"] {
         color: #000000 !important;
-        -webkit-text-fill-color: #000000 !important; /* Safari ve Mobil cihazlar için zorunlu */
+        -webkit-text-fill-color: #000000 !important;
         font-weight: 800 !important;
         background-color: #ffffff !important;
         opacity: 1 !important;
@@ -105,7 +106,7 @@ st.markdown("""
     }
 
     /* Kaydet Butonları */
-    div.stButton > button, div.stFormSubmitButton > button {
+    div.stButton > button, div.stFormSubmitButton > button, div.stDownloadButton > button {
         width: 100% !important;
         height: 50px !important;
         font-size: 16px !important;
@@ -140,6 +141,11 @@ st.markdown("""
 # Turso Bulut Veritabanı Bağlantı Fonksiyonu
 def get_client():
     url = st.secrets["TURSO_DATABASE_URL"]
+    if url.startswith("libsql://"):
+        url = url.replace("libsql://", "https://")
+    elif url.startswith("wss://"):
+        url = url.replace("wss://", "https://")
+        
     token = st.secrets["TURSO_AUTH_TOKEN"]
     return libsql.create_client_sync(url=url, auth_token=token)
 
@@ -604,3 +610,34 @@ with tab4:
                 st.dataframe(df_ekstre, use_container_width=True)
             else:
                 st.info("İşlem hareketi bulunmuyor.")
+
+# ==========================================
+# 5. ALT BÖLÜM: TEK TIKLA YEDEK İNDİRMA
+# ==========================================
+st.divider()
+st.subheader("💾 Veritabanı Yedeği Al (Tek Tıkla İndir)")
+
+with st.expander("📥 Tüm Sistem Yedeğini Bilgisayara / Telefona İndir", expanded=False):
+    st.write("Aşağıdaki butona basarak dükkan hareketleri, toptan satışlar ve firma kayıtlarınızın tam yedeğini **Excel/CSV** formatında anında indirebilirsiniz.")
+    
+    # Tüm tabloları çekip birleştirme
+    try:
+        df_f = run_query_df("SELECT 'Firma' as Tablo, id, firma_adi as Detay_1, telefon as Detay_2, aciklama as Detay_3, NULL as Tarih, NULL as Tutar FROM firmalar")
+        df_t = run_query_df("SELECT 'Toptan Satis' as Tablo, id, firma_adi as Detay_1, islem_turu as Detay_2, aciklama as Detay_3, tarih as Tarih, toplam_tutar as Tutar FROM toptan_satis")
+        df_d = run_query_df("SELECT 'Dukkan Hareket' as Tablo, id, kategori as Detay_1, islem_tipi as Detay_2, urun_adi as Detay_3, tarih as Tarih, tutar as Tutar FROM dukkan_hareket")
+        
+        df_tam_yedek = pd.concat([df_f, df_t, df_d], ignore_index=True)
+        
+        csv_buffer = io.StringIO()
+        df_tam_yedek.to_csv(csv_buffer, index=False, encoding='utf-8-sig')
+        csv_data = csv_buffer.getvalue().encode('utf-8-sig')
+        
+        st.download_button(
+            label="📲 TÜM VERİTABANINI İNDİR (.CSV / EXCEL)",
+            data=csv_data,
+            file_name=f"midyeci_abla_yedek_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.csv",
+            mime="text/csv",
+            type="primary"
+        )
+    except Exception as e:
+        st.error("Yedek hazırlanırken bir hata oluştu.")
