@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 import libsql_client as libsql
+import base64
 
 # Sayfa Ayarları
 st.set_page_config(
@@ -11,29 +12,44 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Koyu Tema & Arka Plan Logo (Filigran) Düzeltmesi
-st.markdown("""
+# Yerel PNG Dosyasını Base64 Formatına Çevirme
+def get_base64_image(image_path):
+    try:
+        with open(image_path, "rb") as img_file:
+            return base64.b64encode(img_file.read()).decode()
+    except Exception:
+        return ""
+
+img_base64 = get_base64_image("1000295034.png")
+
+# Koyu Tema & Arka Plan Logo (Filigran)
+st.markdown(f"""
 <style>
-    /* Arka Plana Saydam Logo ve Koyu Katman Ekleme */
-    .stApp {
-        background: linear-gradient(rgba(15, 23, 42, 0.88), rgba(15, 23, 42, 0.88)), 
-                    url('https://raw.githubusercontent.com/erolcanpolat89-debug/main/1000295034.png') no-repeat center center fixed !important;
-        background-size: contain !important;
-    }
+    /* Ana Ekran Arka Planı (Base64 Logo ile) */
+    .stApp {{
+        background: linear-gradient(rgba(15, 23, 42, 0.85), rgba(15, 23, 42, 0.85)), 
+                    url('data:image/png;base64,{img_base64}') no-repeat center center fixed !important;
+        background-size: min(80vw, 450px) auto !important;
+    }}
+
+    /* Streamlit Üst Çubuk Transparent Yapma */
+    header, [data-testid="stHeader"], [data-testid="stToolbar"] {{
+        background: transparent !important;
+    }}
 
     /* TÜM ETIKETLER VE BAŞLIKLAR (Beyaz ve Kalın) */
     .stApp, .stApp p, .stApp label, .stApp span, 
     div[data-testid="stMarkdownContainer"] p, 
-    label[data-testid="stWidgetLabel"] p {
+    label[data-testid="stWidgetLabel"] p {{
         color: #ffffff !important;
         font-weight: 700 !important;
         opacity: 1 !important;
-    }
+    }}
 
     /* Radio (Seçenek) Buton Metinleri */
-    div[role="radiogroup"] label div[data-testid="stMarkdownContainer"] p {
+    div[role="radiogroup"] label div[data-testid="stMarkdownContainer"] p {{
         color: #ffffff !important;
-    }
+    }}
 
     /* TARİH, DETAY VE TÜM INPUT KUTULARININ İÇİ (Koyu Siyah Yazı) */
     div[data-baseweb="input"] input, 
@@ -41,30 +57,30 @@ st.markdown("""
     div[data-testid="stTextInput"] input,
     div[data-testid="stDateInput"] input,
     input[type="text"], 
-    input[type="number"] {
+    input[type="number"] {{
         color: #000000 !important;
         -webkit-text-fill-color: #000000 !important;
         font-weight: 800 !important;
         background-color: #ffffff !important;
         opacity: 1 !important;
-    }
+    }}
 
     /* Kutuların Arka Planı (Tam Beyaz) */
     div[data-baseweb="input"], 
     div[data-baseweb="base-input"],
-    div[data-baseweb="select"] {
+    div[data-baseweb="select"] {{
         background-color: #ffffff !important;
         border-radius: 10px !important;
-    }
+    }}
 
     /* Selectbox (Açılır Menü) Seçilen Yazı Rengi */
-    div[data-baseweb="select"] div {
+    div[data-baseweb="select"] div {{
         color: #000000 !important;
         font-weight: 800 !important;
-    }
+    }}
 
     /* Başlık Tasarımı */
-    .custom-title {
+    .custom-title {{
         font-size: 26px !important;
         font-weight: 900;
         text-align: center;
@@ -73,40 +89,40 @@ st.markdown("""
         -webkit-text-fill-color: transparent;
         margin-bottom: 20px;
         margin-top: 10px;
-    }
+    }}
 
     /* Sekme (Tabs) Butonları */
-    .stTabs [data-baseweb="tab-list"] {
+    .stTabs [data-baseweb="tab-list"] {{
         gap: 4px;
         background: rgba(255, 255, 255, 0.08);
         padding: 4px;
         border-radius: 12px;
-    }
+    }}
 
-    .stTabs [data-baseweb="tab"] {
+    .stTabs [data-baseweb="tab"] {{
         background-color: transparent;
         border-radius: 8px;
         padding: 6px 10px;
         font-weight: 600;
         color: #cbd5e1 !important;
-    }
+    }}
 
-    .stTabs [aria-selected="true"] {
+    .stTabs [aria-selected="true"] {{
         background: linear-gradient(135deg, #ff4b4b, #dc2626) !important;
         color: #ffffff !important;
-    }
+    }}
 
     /* Glassmorphic Kutu Alanları */
-    div[data-testid="stForm"], div[data-testid="stExpander"] {
-        background: rgba(30, 41, 59, 0.85) !important;
+    div[data-testid="stForm"], div[data-testid="stExpander"] {{
+        background: rgba(30, 41, 59, 0.75) !important;
         border: 1px solid rgba(255, 255, 255, 0.15) !important;
         border-radius: 16px !important;
         box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
         padding: 18px !important;
-    }
+    }}
 
     /* Kaydet Butonları */
-    div.stButton > button, div.stFormSubmitButton > button {
+    div.stButton > button, div.stFormSubmitButton > button {{
         width: 100% !important;
         height: 50px !important;
         font-size: 16px !important;
@@ -116,25 +132,25 @@ st.markdown("""
         color: white !important;
         border: none !important;
         box-shadow: 0 4px 14px rgba(239, 68, 68, 0.4);
-    }
+    }}
 
     /* Metrik Kartları */
-    div[data-testid="stMetric"] {
+    div[data-testid="stMetric"] {{
         background: rgba(255, 255, 255, 0.05);
         border: 1px solid rgba(255, 255, 255, 0.1);
         border-radius: 14px;
         padding: 12px 16px;
-    }
+    }}
 
-    div[data-testid="stMetricValue"] {
+    div[data-testid="stMetricValue"] {{
         font-size: 24px !important;
         font-weight: 800 !important;
         color: #ff6b6b !important;
-    }
+    }}
 
-    div[data-testid="stMetricLabel"] {
+    div[data-testid="stMetricLabel"] {{
         color: #cbd5e1 !important;
-    }
+    }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -201,7 +217,7 @@ for col, dtype in [("islem_turu", "TEXT DEFAULT 'Satış'"), ("adet", "INTEGER D
     except Exception:
         pass
 
-# Başlık (Arka plan logolu iken şık görünüm)
+# Başlık
 st.markdown('<div class="custom-title">🦪 MİDYECİ ABLA CANLI TAKİP</div>', unsafe_allow_html=True)
 
 # Sekmeler (5 Sekmeli Yapı)
