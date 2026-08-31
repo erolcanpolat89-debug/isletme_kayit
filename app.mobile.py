@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, date
 import libsql_client as libsql
 import io
 
@@ -105,7 +105,7 @@ st.markdown("""
         padding: 18px !important;
     }
 
-    /* Kaydet Butonları */
+    /* Kaydet & İndir Butonları */
     div.stButton > button, div.stFormSubmitButton > button, div.stDownloadButton > button {
         width: 100% !important;
         height: 50px !important;
@@ -563,28 +563,52 @@ with tab3:
     st.dataframe(df_f_list, use_container_width=True)
 
 # ==========================================
-# 4. SEKME: CARİ EKSTRE
+# 4. SEKME: CARİ EKSTRE & FİRMAYA RAPOR GÖNDERME
 # ==========================================
 with tab4:
-    st.subheader("📊 Firma Cari Ekstresi")
+    st.subheader("📊 Firma Cari Hesap Ekstresi")
     
     df_firmalar_cari = run_query_df("SELECT firma_adi FROM firmalar ORDER BY firma_adi ASC")
     
     if not df_firmalar_cari.empty:
         firmalar_list = df_firmalar_cari["firma_adi"].tolist()
-        secili_firma_detay = st.selectbox("🔍 Firma Seçin:", firmalar_list)
         
+        # Filtreleme Seçenekleri
+        col_f1, col_f2 = st.columns(2)
+        with col_f1:
+            secili_firma_detay = st.selectbox("🔍 Firma Seçin:", firmalar_list)
+            rapor_tipi = st.radio("Rapor Formatı:", ["Detaylı Ekstre", "Sadece Özet (Bakiye)"], horizontal=True)
+        
+        with col_f2:
+            baslangic_tarihi = st.date_input("Başlangıç Tarihi:", datetime(2024, 1, 1))
+            bitis_tarihi = st.date_input("Bitiş Tarihi:", datetime.now())
+            
+        str_bas = baslangic_tarihi.strftime("%Y-%m-%d")
+        str_bit = bitis_tarihi.strftime("%Y-%m-%d")
+
         if secili_firma_detay:
             st.divider()
             st.markdown(f"### 📌 {secili_firma_detay}")
+            st.caption(f"🗓️ **Tarih Aralığı:** {str_bas} / {str_bit}")
             
-            df_f_satis = run_query_df("SELECT SUM(toplam_tutar) as t FROM toptan_satis WHERE firma_adi=? AND islem_turu='Satış'", [secili_firma_detay])
-            df_f_tahsilat = run_query_df("SELECT SUM(toplam_tutar) as t FROM toptan_satis WHERE firma_adi=? AND islem_turu='Tahsilat'", [secili_firma_detay])
+            # Seçilen tarih aralığındaki veriler
+            df_f_satis = run_query_df("""
+                SELECT SUM(toplam_tutar) as t 
+                FROM toptan_satis 
+                WHERE firma_adi=? AND islem_turu='Satış' AND tarih BETWEEN ? AND ?
+            """, [secili_firma_detay, str_bas, str_bit])
+            
+            df_f_tahsilat = run_query_df("""
+                SELECT SUM(toplam_tutar) as t 
+                FROM toptan_satis 
+                WHERE firma_adi=? AND islem_turu='Tahsilat' AND tarih BETWEEN ? AND ?
+            """, [secili_firma_detay, str_bas, str_bit])
             
             tot_satis = df_f_satis['t'].iloc[0] if not df_f_satis.empty and pd.notnull(df_f_satis['t'].iloc[0]) else 0.0
             tot_tahsilat = df_f_tahsilat['t'].iloc[0] if not df_f_tahsilat.empty and pd.notnull(df_f_tahsilat['t'].iloc[0]) else 0.0
             net_bakiye = tot_satis - tot_tahsilat
             
+            # Özet Metrikler
             col1, col2, col3 = st.columns(3)
             with col1:
                 st.metric("Toplam Satış", f"{tot_satis:,.2f} TL")
@@ -598,18 +622,73 @@ with tab4:
                 else:
                     st.metric("Net Bakiye", "0.00 TL", delta="Dengede")
                 
-            st.write("**İşlem Geçmişi**")
+            # İşlem Listesi
             df_ekstre = run_query_df("""
-                SELECT tarih as 'Tarih', islem_turu as 'İşlem', adet as 'Adet', toplam_tutar as 'Tutar (TL)'
+                SELECT tarih as 'Tarih', islem_turu as 'İşlem Türü', adet as 'Adet', birim_fiyat as 'Birim Fiyat', toplam_tutar as 'Tutar (TL)', aciklama as 'Açıklama'
                 FROM toptan_satis 
-                WHERE firma_adi=? 
-                ORDER BY id DESC
-            """, [secili_firma_detay])
+                WHERE firma_adi=? AND tarih BETWEEN ? AND ?
+                ORDER BY tarih ASC, id ASC
+            """, [secili_firma_detay, str_bas, str_bit])
             
-            if not df_ekstre.empty:
-                st.dataframe(df_ekstre, use_container_width=True)
+            if rapor_tipi == "Detaylı Ekstre":
+                st.write("**İşlem Geçmişi Detayı**")
+                if not df_ekstre.empty:
+                    st.dataframe(df_ekstre, use_container_width=True)
+                else:
+                    st.info("Seçilen tarih aralığında işlem hareketi bulunamadı.")
+            
+            st.divider()
+            st.write("📄 **Firmaya Göndermek İçin Ekstreyi İndir**")
+            
+            # 1. EXCEL / CSV FORMATINDA İNDİRME
+            if rapor_tipi == "Detaylı Ekstre" and not df_ekstre.empty:
+                excel_csv_buffer = io.StringIO()
+                df_ekstre.to_csv(excel_csv_buffer, index=False, encoding='utf-8-sig')
+                excel_data = excel_csv_buffer.getvalue().encode('utf-8-sig')
+                
+                st.download_button(
+                    label="📊 Ekstreyi Excel/CSV Olarak İndir",
+                    data=excel_data,
+                    file_name=f"{secili_firma_detay}_Cari_Ekstre_{str_bas}_{str_bit}.csv",
+                    mime="text/csv"
+                )
+            
+            # 2. METİN / NOT DEFTERİ (.TXT) FORMATINDA İNDİRME (WhatsApp/Mail paylaşımı için mükemmel)
+            txt_rapor = f"=========================================\n"
+            txt_rapor += f"         MİDYECİ ABLA CARİ HESAP EKSTRESİ\n"
+            txt_rapor += f"=========================================\n"
+            txt_rapor += f"FİRMA: {secili_firma_detay}\n"
+            txt_rapor += f"TARİH ARALIĞI: {str_bas} / {str_bit}\n"
+            txt_rapor += f"DÜZENLEME TARİHİ: {datetime.now().strftime('%Y-%m-%d %H:%M')}\n"
+            txt_rapor += f"-----------------------------------------\n"
+            
+            if rapor_tipi == "Detaylı Ekstre" and not df_ekstre.empty:
+                txt_rapor += "İŞLEM DETAYLARI:\n"
+                for idx, row in df_ekstre.iterrows():
+                    acik = f" ({row['Açıklama']})" if pd.notnull(row['Açıklama']) and row['Açıklama'] != "" else ""
+                    if row['İşlem Türü'] == "Satış":
+                        txt_rapor += f"• {row['Tarih']} | Satış: {row['Adet']} Adet x {row['Birim Fiyat']} TL = {row['Tutar (TL)']:,.2f} TL{acik}\n"
+                    else:
+                        txt_rapor += f"• {row['Tarih']} | Tahsilat: {row['Tutar (TL)']:,.2f} TL{acik}\n"
+                txt_rapor += f"-----------------------------------------\n"
+            
+            txt_rapor += f"ÖZET BAKİYE DURUMU:\n"
+            txt_rapor += f"• Toplam Satış (Borç) : {tot_satis:,.2f} TL\n"
+            txt_rapor += f"• Toplam Tahsilat     : {tot_tahsilat:,.2f} TL\n"
+            if net_bakiye > 0:
+                txt_rapor += f"• KALAN NET BORÇ     : {net_bakiye:,.2f} TL\n"
+            elif net_bakiye < 0:
+                txt_rapor += f"• ALACAK BAKİYESİ    : {abs(net_bakiye):,.2f} TL\n"
             else:
-                st.info("İşlem hareketi bulunmuyor.")
+                txt_rapor += f"• NET BAKİYE         : 0.00 TL (HESAP KAPALI)\n"
+            txt_rapor += f"=========================================\n"
+
+            st.download_button(
+                label="📝 Ekstreyi Metin / WhatsApp Formatında İndir (.TXT)",
+                data=txt_rapor.encode('utf-8-sig'),
+                file_name=f"{secili_firma_detay}_Ekstre_{str_bas}_{str_bit}.txt",
+                mime="text/plain"
+            )
 
 # ==========================================
 # 5. ALT BÖLÜM: TEK TIKLA YEDEK İNDİRMA
