@@ -1,4 +1,5 @@
-import streamlit as st
+
+            import streamlit as st
 import pandas as pd
 from datetime import datetime
 import libsql_client as libsql
@@ -282,13 +283,13 @@ client.execute('''
         islem_tipi TEXT,
         kategori TEXT,
         urun_adi TEXT,
-        miktar INTEGER,
+        miktarı INTEGER,
         birim_fiyat REAL,
         tutar REAL
     )
 ''')
 
-# 1 Kez Kayıp Ortada Duracak Saydam Gri Çerçeveli Başlık
+# Başlık Kutusu
 st.markdown("""
 <div class="marquee-box">
     <marquee class="marquee-text" behavior="slide" direction="left" scrollamount="8" loop="1">
@@ -308,6 +309,12 @@ bugun = datetime.now().strftime("%Y-%m-%d")
 with tab1:
     st.subheader("🏪 Dükkan Hareketleri & Ekstre")
     
+    # Hafıza için Session State Tanımlamaları
+    if "son_birim_fiyat" not in st.session_state:
+        st.session_state.son_birim_fiyat = 1.75
+    if "son_kategori" not in st.session_state:
+        st.session_state.son_kategori = "Midye"
+
     islem_modu = st.radio("İşlem Seçin:", ["🔴 Yeni Hareket", "📅 Tarihe Göre Bul", "📈 Dükkan Ekstresi", "📋 Tüm Kayıtları Yönet"], horizontal=True)
 
     if islem_modu == "🔴 Yeni Hareket":
@@ -316,32 +323,45 @@ with tab1:
             with col1:
                 islem_tipi = st.selectbox("İşlem Tipi", ["Günlük Satış (Gelir)", "Dükkan Gideri (Gider)"])
                 tarih_secim = st.date_input("Tarih", datetime.now())
-                kategori = st.selectbox("Kategori", ["Çiğ Köfte", "Midye", "İçecek", "Dükkan Gideri", "Personel", "Diğer"])
+                
+                kat_listesi = ["Midye", "Çiğ Köfte", "İçecek", "Dükkan Gideri", "Personel", "Diğer"]
+                # Son seçilen kategoriyi listede bulup varsayılan index yapalım
+                default_kat_idx = kat_listesi.index(st.session_state.son_kategori) if st.session_state.son_kategori in kat_listesi else 0
+                kategori = st.selectbox("Kategori", kat_listesi, index=default_kat_idx)
+                
             with col2:
                 urun_adi = st.text_input("Ürün / Detay Açıklaması", placeholder="Örn: Midye Satışı veya Kira Gideri")
-                miktar = st.number_input("Miktar / Adet", min_value=1, value=1, step=1)
-                tutar = st.number_input("Toplam Tutar (TL)", min_value=0.0, value=0.0, step=10.0)
+                miktar = st.number_input("Miktar / Adet", min_value=1, value=10, step=1)
+                
+                # Hafızadaki son birim fiyatı otomatik getir
+                birim_fiyat = st.number_input("Birim Fiyat (TL)", min_value=0.0, value=float(st.session_state.son_birim_fiyat), step=0.25, format="%.2f")
+
+            # Otomatik Çarpım Hesaplaması ve Gösterimi
+            hesaplanan_tutar = miktar * birim_fiyat
+            st.markdown(f"**Hesaplanan Toplam Tutar:** `### {hesaplanan_tutar:,.2f} TL`")
 
             submitted = st.form_submit_button("💾 Dükkan Hareketi Kaydet")
             if submitted:
-                if tutar > 0:
+                if miktar > 0 and birim_fiyat > 0:
+                    # Değerleri hafızaya al
+                    st.session_state.son_birim_fiyat = birim_fiyat
+                    st.session_state.son_kategori = kategori
+                    
                     simdi_zaman = datetime.now().strftime("%H:%M:%S")
                     tam_tarih_saat = f"{tarih_secim.strftime('%Y-%m-%d')} {simdi_zaman}"
                     
-                    birim_fiyat = tutar / miktar if miktar > 0 else 0
                     client.execute(
                         "INSERT INTO dukkan_hareket (tarih, islem_tipi, kategori, urun_adi, miktar, birim_fiyat, tutar) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                        [tam_tarih_saat, islem_tipi, kategori, urun_adi, miktar, birim_fiyat, tutar]
+                        [tam_tarih_saat, islem_tipi, kategori, urun_adi, miktar, birim_fiyat, hesaplanan_tutar]
                     )
-                    st.success(f"Dükkan hareketi başarıyla kaydedildi! ({tam_tarih_saat})")
+                    st.success(f"Dükkan hareketi başarıyla kaydedildi! ({tam_tarih_saat}) - Toplam: {hesaplanan_tutar:,.2f} TL")
                     st.rerun()
                 else:
-                    st.warning("Lütfen geçerli bir tutar girin!")
+                    st.warning("Lütfen miktar ve birim fiyatı sıfırdan büyük girin!")
 
         st.markdown("---")
         st.subheader("📋 Bugünün Dükkan Kayıtları")
         
-        # Sadece bugünün kayıtlarını getiren sorgu
         df_bugun_dukkan = run_query_df("SELECT * FROM dukkan_hareket WHERE SUBSTR(tarih, 1, 10) = ? ORDER BY id DESC", [bugun])
         
         if not df_bugun_dukkan.empty:
@@ -349,7 +369,7 @@ with tab1:
         else:
             st.info("Bugüne ait henüz dükkan hareketi kaydedilmedi.")
 
-    elif islem_modu == "📅 Tarihe Göre Bul":
+     elif islem_modu == "📅 Tarihe Göre Bul":
         secilen_tarih = st.date_input("Filtrelenecek Tarih", datetime.now()).strftime("%Y-%m-%d")
         df_dukkan_tarih = run_query_df("SELECT * FROM dukkan_hareket WHERE SUBSTR(tarih, 1, 10) = ? ORDER BY id DESC", [secilen_tarih])
         
@@ -395,6 +415,17 @@ with tab1:
             st.markdown(f"<p style='text-align: center; color: #555;'>Tarih Aralığı: <b>{baslangic_tarihi}</b> ile <b>{bitis_tarihi}</b> | Kategori: <b>{secilen_kategori}</b></p>", unsafe_allow_html=True)
             st.markdown("<hr>", unsafe_allow_html=True)
             
+            if ekstre_tipi == "Detaylı Ekstre (Tüm İşlemler)":
+                st.dataframe(df_ekstre, use_container_width=True)
+            else:
+                df_ozet = df_ekstre.groupby("kategori")["tutar"].sum().reset_index()
+                st.dataframe(df_ozet, use_container_width=True)
+                
+            toplam_tutar_ekstre = df_ekstre["tutar"].sum()
+            st.markdown(f"<h3 style='text-align: right; color: #000000;'>Toplam Tutar: {toplam_tutar_ekstre:,.2f} TL</h3>", unsafe_allow_html=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+        else:
+            st.info("Seçilen kriterlere uygun dükkan hareketi bulunamadı.")
             if ekstre_tipi == "Detaylı Ekstre (Tüm İşlemler)":
                 st.write(f"Toplam İşlem Adedi: **{len(df_ekstre)}**")
                 st.dataframe(df_ekstre, use_container_width=True)
