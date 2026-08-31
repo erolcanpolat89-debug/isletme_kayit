@@ -244,8 +244,8 @@ with tab1:
             st.divider()
             st.write("**İşlem Düzenle / Sil**")
             secilen_d_id = st.selectbox("Düzenlenecek Kaydı Seçin:", 
-                                       options=df_dukkan_gun["id"], 
-                                       format_func=lambda x: f"ID:{x} - {df_dukkan_gun[df_dukkan_gun['id']==x]['kategori'].values[0]} ({df_dukkan_gun[df_dukkan_gun['id']==x]['tutar'].values[0]} TL)")
+                                        options=df_dukkan_gun["id"], 
+                                        format_func=lambda x: f"ID:{x} - {df_dukkan_gun[df_dukkan_gun['id']==x]['kategori'].values[0]} ({df_dukkan_gun[df_dukkan_gun['id']==x]['tutar'].values[0]} TL)")
             
             kayit_d = df_dukkan_gun[df_dukkan_gun["id"] == secilen_d_id].iloc[0]
             kat_list = ["Midye Dolma", "Çiğ Köfte", "İçecek", "Dükkan Genel Gider", "Diğer"]
@@ -287,8 +287,8 @@ with tab1:
         
         if not df_dukkan_all.empty:
             secilen_d_id = st.selectbox("Kayıt Seçin:", 
-                                       options=df_dukkan_all["id"], 
-                                       format_func=lambda x: f"ID:{x} - {df_dukkan_all[df_dukkan_all['id']==x]['tarih'].values[0]} - {df_dukkan_all[df_dukkan_all['id']==x]['kategori'].values[0]} ({df_dukkan_all[df_dukkan_all['id']==x]['tutar'].values[0]} TL)")
+                                        options=df_dukkan_all["id"], 
+                                        format_func=lambda x: f"ID:{x} - {df_dukkan_all[df_dukkan_all['id']==x]['tarih'].values[0]} - {df_dukkan_all[df_dukkan_all['id']==x]['kategori'].values[0]} ({df_dukkan_all[df_dukkan_all['id']==x]['tutar'].values[0]} TL)")
             
             kayit_d = df_dukkan_all[df_dukkan_all["id"] == secilen_d_id].iloc[0]
             kat_list = ["Midye Dolma", "Çiğ Köfte", "İçecek", "Dükkan Genel Gider", "Diğer"]
@@ -613,4 +613,5 @@ with tab4:
             else:
                 st.info("İşlem hareketi bulunmuyor.")
 
+# Veritabanı Bağlantısını Kapat
 conn.close()
