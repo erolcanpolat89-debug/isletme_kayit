@@ -1,7 +1,7 @@
 import streamlit as st
-import sqlite3
 import pandas as pd
 from datetime import datetime
+import libsql_client as libsql
 
 # Sayfa Ayarları
 st.set_page_config(
@@ -137,16 +137,23 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Veritabanı Bağlantısı
-def get_connection():
-    conn = sqlite3.connect("isletme_takip.db", check_same_thread=False)
-    return conn
+# Turso Bulut Veritabanı Bağlantı Fonksiyonu
+def get_client():
+    url = st.secrets["TURSO_DATABASE_URL"]
+    token = st.secrets["TURSO_AUTH_TOKEN"]
+    return libsql.create_client_sync(url=url, auth_token=token)
 
-conn = get_connection()
-cursor = conn.cursor()
+client = get_client()
 
-# Tablolar
-cursor.execute('''
+# Yardımcı Fonksiyon: Libsql Sonucunu Pandas Dataframe'e Çevirir
+def run_query_df(query, params=None):
+    res = client.execute(query, params or [])
+    columns = res.columns
+    rows = res.rows
+    return pd.DataFrame(rows, columns=columns)
+
+# Tabloları Oluşturma
+client.execute('''
     CREATE TABLE IF NOT EXISTS firmalar (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         firma_adi TEXT UNIQUE,
@@ -155,7 +162,7 @@ cursor.execute('''
     )
 ''')
 
-cursor.execute('''
+client.execute('''
     CREATE TABLE IF NOT EXISTS toptan_satis (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         firma_adi TEXT,
@@ -168,7 +175,7 @@ cursor.execute('''
     )
 ''')
 
-cursor.execute('''
+client.execute('''
     CREATE TABLE IF NOT EXISTS dukkan_hareket (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         tarih TEXT,
@@ -180,14 +187,12 @@ cursor.execute('''
         tutar REAL
     )
 ''')
-conn.commit()
 
-# Otomatik Sütun Güncelleme
+# Otomatik Sütun Güncelleme Kontrolü
 for col, dtype in [("islem_turu", "TEXT DEFAULT 'Satış'"), ("adet", "INTEGER DEFAULT 0"), ("birim_fiyat", "REAL DEFAULT 0.0")]:
     try:
-        cursor.execute(f"ALTER TABLE toptan_satis ADD COLUMN {col} {dtype}")
-        conn.commit()
-    except sqlite3.OperationalError:
+        client.execute(f"ALTER TABLE toptan_satis ADD COLUMN {col} {dtype}")
+    except Exception:
         pass
 
 # Başlık
@@ -219,11 +224,10 @@ with tab1:
             
             kaydet_d = st.form_submit_button("💾 Hareketi Kaydet", type="primary")
             if kaydet_d:
-                cursor.execute("""
+                client.execute("""
                     INSERT INTO dukkan_hareket (tarih, islem_tipi, kategori, urun_adi, miktar, birim_fiyat, tutar)
                     VALUES (?, ?, ?, ?, ?, ?, ?)
-                """, (tarih_d.strftime("%Y-%m-%d"), islem_tipi, kategori, urun_adi, miktar, birim_fiyat_d, toplam_d))
-                conn.commit()
+                """, [tarih_d.strftime("%Y-%m-%d"), islem_tipi, kategori, urun_adi, miktar, birim_fiyat_d, toplam_d])
                 st.success("Kayıt eklendi!")
                 st.rerun()
 
@@ -232,7 +236,7 @@ with tab1:
         secilen_d_tarih = st.date_input("Sorgulanacak Tarih Seçin:", datetime.now(), key="dukkan_tarih_sorgu")
         str_d_tarih = secilen_d_tarih.strftime("%Y-%m-%d")
         
-        df_dukkan_gun = pd.read_sql_query("SELECT id, tarih, islem_tipi, kategori, urun_adi, miktar, birim_fiyat, tutar FROM dukkan_hareket WHERE tarih=? ORDER BY id DESC", conn, params=(str_d_tarih,))
+        df_dukkan_gun = run_query_df("SELECT id, tarih, islem_tipi, kategori, urun_adi, miktar, birim_fiyat, tutar FROM dukkan_hareket WHERE tarih=? ORDER BY id DESC", [str_d_tarih])
         
         if df_dukkan_gun.empty:
             st.warning(f"🔍 {str_d_tarih} tarihine ait dükkan hareketi bulunamadı.")
@@ -253,7 +257,7 @@ with tab1:
             
             with st.form("dukkan_gun_duzenle_form"):
                 e_tip = st.selectbox("İşlem Tipi", tip_list, index=tip_list.index(kayit_d["islem_tipi"]) if kayit_d["islem_tipi"] in tip_list else 0)
-                e_tarih_d = st.date_input("Tarih", datetime.strptime(kayit_d["tarih"], "%Y-%m-%d"))
+                e_tarih_d = st.date_input("Tarih", datetime.strptime(str(kayit_d["tarih"]), "%Y-%m-%d"))
                 e_kat = st.selectbox("Kategori", kat_list, index=kat_list.index(kayit_d["kategori"]) if kayit_d["kategori"] in kat_list else 0)
                 e_urun = st.text_input("Ürün / Detay", value=str(kayit_d["urun_adi"]) if kayit_d["urun_adi"] else "")
                 e_m = st.number_input("Miktar", min_value=1, step=1, value=int(kayit_d["miktar"]))
@@ -266,24 +270,22 @@ with tab1:
                 sil_d = st.form_submit_button("🗑️ Sil")
                 
                 if guncelle_d:
-                    cursor.execute("""
+                    client.execute("""
                         UPDATE dukkan_hareket 
                         SET tarih=?, islem_tipi=?, kategori=?, urun_adi=?, miktar=?, birim_fiyat=?, tutar=? 
                         WHERE id=?
-                    """, (e_tarih_d.strftime("%Y-%m-%d"), e_tip, e_kat, e_urun, e_m, e_f, e_toplam_d, secilen_d_id))
-                    conn.commit()
+                    """, [e_tarih_d.strftime("%Y-%m-%d"), e_tip, e_kat, e_urun, e_m, e_f, e_toplam_d, int(secilen_d_id)])
                     st.success("Kayıt güncellendi!")
                     st.rerun()
                     
                 if sil_d:
-                    cursor.execute("DELETE FROM dukkan_hareket WHERE id=?", (secilen_d_id,))
-                    conn.commit()
+                    client.execute("DELETE FROM dukkan_hareket WHERE id=?", [int(secilen_d_id)])
                     st.warning("Kayıt silindi!")
                     st.rerun()
 
     else:
         st.subheader("Tüm Dükkan Kayıtlarını Yönet")
-        df_dukkan_all = pd.read_sql_query("SELECT id, tarih, islem_tipi, kategori, urun_adi, miktar, birim_fiyat, tutar FROM dukkan_hareket ORDER BY id DESC", conn)
+        df_dukkan_all = run_query_df("SELECT id, tarih, islem_tipi, kategori, urun_adi, miktar, birim_fiyat, tutar FROM dukkan_hareket ORDER BY id DESC")
         
         if not df_dukkan_all.empty:
             secilen_d_id = st.selectbox("Kayıt Seçin:", 
@@ -296,7 +298,7 @@ with tab1:
             
             with st.form("dukkan_duzenle_form"):
                 e_tip = st.selectbox("İşlem Tipi", tip_list, index=tip_list.index(kayit_d["islem_tipi"]) if kayit_d["islem_tipi"] in tip_list else 0)
-                e_tarih_d = st.date_input("Tarih", datetime.strptime(kayit_d["tarih"], "%Y-%m-%d"))
+                e_tarih_d = st.date_input("Tarih", datetime.strptime(str(kayit_d["tarih"]), "%Y-%m-%d"))
                 e_kat = st.selectbox("Kategori", kat_list, index=kat_list.index(kayit_d["kategori"]) if kayit_d["kategori"] in kat_list else 0)
                 e_urun = st.text_input("Ürün / Detay", value=str(kayit_d["urun_adi"]) if kayit_d["urun_adi"] else "")
                 e_m = st.number_input("Miktar", min_value=1, step=1, value=int(kayit_d["miktar"]))
@@ -309,32 +311,30 @@ with tab1:
                 sil_d = st.form_submit_button("🗑️ Sil")
                 
                 if guncelle_d:
-                    cursor.execute("""
+                    client.execute("""
                         UPDATE dukkan_hareket 
                         SET tarih=?, islem_tipi=?, kategori=?, urun_adi=?, miktar=?, birim_fiyat=?, tutar=? 
                         WHERE id=?
-                    """, (e_tarih_d.strftime("%Y-%m-%d"), e_tip, e_kat, e_urun, e_m, e_f, e_toplam_d, secilen_d_id))
-                    conn.commit()
+                    """, [e_tarih_d.strftime("%Y-%m-%d"), e_tip, e_kat, e_urun, e_m, e_f, e_toplam_d, int(secilen_d_id)])
                     st.success("Kayıt güncellendi!")
                     st.rerun()
                     
                 if sil_d:
-                    cursor.execute("DELETE FROM dukkan_hareket WHERE id=?", (secilen_d_id,))
-                    conn.commit()
+                    client.execute("DELETE FROM dukkan_hareket WHERE id=?", [int(secilen_d_id)])
                     st.warning("Kayıt silindi!")
                     st.rerun()
 
     st.divider()
     
     # Günlük Özet
-    df_dukkan_bugun = pd.read_sql_query("""
+    df_dukkan_bugun = run_query_df("""
         SELECT SUM(miktar) as adet, SUM(tutar) as ciro 
         FROM dukkan_hareket 
         WHERE tarih=? AND kategori='Midye Dolma' AND islem_tipi='Günlük Satış (Gelir)'
-    """, conn, params=(bugun,))
+    """, [bugun])
     
-    d_adet = df_dukkan_bugun['adet'].iloc[0] or 0
-    d_ciro = df_dukkan_bugun['ciro'].iloc[0] or 0.0
+    d_adet = df_dukkan_bugun['adet'].iloc[0] if not df_dukkan_bugun.empty and pd.notnull(df_dukkan_bugun['adet'].iloc[0]) else 0
+    d_ciro = df_dukkan_bugun['ciro'].iloc[0] if not df_dukkan_bugun.empty and pd.notnull(df_dukkan_bugun['ciro'].iloc[0]) else 0.0
     
     col1, col2 = st.columns(2)
     with col1:
@@ -343,14 +343,14 @@ with tab1:
         st.metric("Bugün Dükkan Ciro", f"{d_ciro:,.2f} TL")
     
     st.write("**Son Dükkan Kayıtları**")
-    df_dukkan_view = pd.read_sql_query("SELECT tarih as 'Tarih', kategori as 'Kategori', miktar as 'Adet', tutar as 'Tutar' FROM dukkan_hareket ORDER BY id DESC LIMIT 10", conn)
+    df_dukkan_view = run_query_df("SELECT tarih as 'Tarih', kategori as 'Kategori', miktar as 'Adet', tutar as 'Tutar' FROM dukkan_hareket ORDER BY id DESC LIMIT 10")
     st.dataframe(df_dukkan_view, use_container_width=True)
 
 # ==========================================
 # 2. SEKME: TOPTAN
 # ==========================================
 with tab2:
-    df_firmalar_opt = pd.read_sql_query("SELECT firma_adi FROM firmalar ORDER BY firma_adi ASC", conn)
+    df_firmalar_opt = run_query_df("SELECT firma_adi FROM firmalar ORDER BY firma_adi ASC")
     firma_listesi = df_firmalar_opt["firma_adi"].tolist() if not df_firmalar_opt.empty else []
 
     if not firma_listesi:
@@ -382,11 +382,10 @@ with tab2:
                 kaydet = st.form_submit_button("💾 İşlemi Kaydet", type="primary")
                 if kaydet:
                     t_tur = "Satış" if islem_turu == "Satış (Borç Ekle)" else "Tahsilat"
-                    cursor.execute("""
+                    client.execute("""
                         INSERT INTO toptan_satis (firma_adi, tarih, islem_turu, adet, birim_fiyat, toplam_tutar, aciklama)
                         VALUES (?, ?, ?, ?, ?, ?, ?)
-                    """, (firma, tarih.strftime("%Y-%m-%d"), t_tur, adet, birim_fiyat, toplam_tutar, aciklama))
-                    conn.commit()
+                    """, [firma, tarih.strftime("%Y-%m-%d"), t_tur, adet, birim_fiyat, toplam_tutar, aciklama])
                     st.success(f"{t_tur} kaydedildi!")
                     st.rerun()
 
@@ -395,7 +394,7 @@ with tab2:
             secilen_tarih = st.date_input("Sorgulanacak Tarih Seçin:", datetime.now(), key="toptan_tarih_sorgu")
             str_tarih = secilen_tarih.strftime("%Y-%m-%d")
             
-            df_toptan_gun = pd.read_sql_query("SELECT id, firma_adi, tarih, islem_turu, adet, birim_fiyat, toplam_tutar, aciklama FROM toptan_satis WHERE tarih=? ORDER BY id DESC", conn, params=(str_tarih,))
+            df_toptan_gun = run_query_df("SELECT id, firma_adi, tarih, islem_turu, adet, birim_fiyat, toplam_tutar, aciklama FROM toptan_satis WHERE tarih=? ORDER BY id DESC", [str_tarih])
             
             if df_toptan_gun.empty:
                 st.warning(f"🔍 {str_tarih} tarihine ait toptan işlem kaydı bulunamadı.")
@@ -416,7 +415,7 @@ with tab2:
                 with st.form("toptan_gun_duzenle_form"):
                     e_tur = st.selectbox("İşlem Türü", ["Satış", "Tahsilat"], index=0 if kayit["islem_turu"] == "Satış" else 1)
                     e_firma = st.selectbox("Firma Seçin", firma_listesi, index=firma_listesi.index(kayit["firma_adi"]) if kayit["firma_adi"] in firma_listesi else 0)
-                    e_tarih = st.date_input("Tarih", datetime.strptime(kayit["tarih"], "%Y-%m-%d"))
+                    e_tarih = st.date_input("Tarih", datetime.strptime(str(kayit["tarih"]), "%Y-%m-%d"))
                     
                     if e_tur == "Satış":
                         e_adet = st.number_input("Adet", min_value=0, step=50, value=int(kayit["adet"]))
@@ -434,24 +433,22 @@ with tab2:
                     sil = st.form_submit_button("🗑️ Sil")
                     
                     if guncelle:
-                        cursor.execute("""
+                        client.execute("""
                             UPDATE toptan_satis 
                             SET firma_adi=?, tarih=?, islem_turu=?, adet=?, birim_fiyat=?, toplam_tutar=?, aciklama=? 
                             WHERE id=?
-                        """, (e_firma, e_tarih.strftime("%Y-%m-%d"), e_tur, e_adet, e_birim_fiyat, e_toplam, e_aciklama, secilen_id))
-                        conn.commit()
+                        """, [e_firma, e_tarih.strftime("%Y-%m-%d"), e_tur, e_adet, e_birim_fiyat, e_toplam, e_aciklama, int(secilen_id)])
                         st.success("Kayıt güncellendi!")
                         st.rerun()
                         
                     if sil:
-                        cursor.execute("DELETE FROM toptan_satis WHERE id=?", (secilen_id,))
-                        conn.commit()
+                        client.execute("DELETE FROM toptan_satis WHERE id=?", [int(secilen_id)])
                         st.warning("Kayıt silindi!")
                         st.rerun()
 
         else:
             st.subheader("Tüm Toptan Kayıtlarını Yönet")
-            df_toptan_all = pd.read_sql_query("SELECT id, firma_adi, tarih, islem_turu, adet, birim_fiyat, toplam_tutar, aciklama FROM toptan_satis ORDER BY id DESC", conn)
+            df_toptan_all = run_query_df("SELECT id, firma_adi, tarih, islem_turu, adet, birim_fiyat, toplam_tutar, aciklama FROM toptan_satis ORDER BY id DESC")
             
             if not df_toptan_all.empty:
                 secilen_id = st.selectbox(
@@ -465,7 +462,7 @@ with tab2:
                 with st.form("toptan_duzenle_form"):
                     e_tur = st.selectbox("İşlem Türü", ["Satış", "Tahsilat"], index=0 if kayit["islem_turu"] == "Satış" else 1)
                     e_firma = st.selectbox("Firma Seçin", firma_listesi, index=firma_listesi.index(kayit["firma_adi"]) if kayit["firma_adi"] in firma_listesi else 0)
-                    e_tarih = st.date_input("Tarih", datetime.strptime(kayit["tarih"], "%Y-%m-%d"))
+                    e_tarih = st.date_input("Tarih", datetime.strptime(str(kayit["tarih"]), "%Y-%m-%d"))
                     
                     if e_tur == "Satış":
                         e_adet = st.number_input("Adet", min_value=0, step=50, value=int(kayit["adet"]))
@@ -483,24 +480,22 @@ with tab2:
                     sil = st.form_submit_button("🗑️ Sil")
                     
                     if guncelle:
-                        cursor.execute("""
+                        client.execute("""
                             UPDATE toptan_satis 
                             SET firma_adi=?, tarih=?, islem_turu=?, adet=?, birim_fiyat=?, toplam_tutar=?, aciklama=? 
                             WHERE id=?
-                        """, (e_firma, e_tarih.strftime("%Y-%m-%d"), e_tur, e_adet, e_birim_fiyat, e_toplam, e_aciklama, secilen_id))
-                        conn.commit()
+                        """, [e_firma, e_tarih.strftime("%Y-%m-%d"), e_tur, e_adet, e_birim_fiyat, e_toplam, e_aciklama, int(secilen_id)])
                         st.success("Kayıt güncellendi!")
                         st.rerun()
                         
                     if sil:
-                        cursor.execute("DELETE FROM toptan_satis WHERE id=?", (secilen_id,))
-                        conn.commit()
+                        client.execute("DELETE FROM toptan_satis WHERE id=?", [int(secilen_id)])
                         st.warning("Kayıt silindi!")
                         st.rerun()
 
         st.divider()
         st.write("**Son İşlemler**")
-        df_toptan_view = pd.read_sql_query("SELECT firma_adi as 'Firma', tarih as 'Tarih', islem_turu as 'İşlem', toplam_tutar as 'Tutar' FROM toptan_satis ORDER BY id DESC LIMIT 10", conn)
+        df_toptan_view = run_query_df("SELECT firma_adi as 'Firma', tarih as 'Tarih', islem_turu as 'İşlem', toplam_tutar as 'Tutar' FROM toptan_satis ORDER BY id DESC LIMIT 10")
         st.dataframe(df_toptan_view, use_container_width=True)
 
 # ==========================================
@@ -519,16 +514,15 @@ with tab3:
             f_kaydet = st.form_submit_button("➕ Firmayı Kaydet", type="primary")
             if f_kaydet and yeni_f_adi:
                 try:
-                    cursor.execute("INSERT INTO firmalar (firma_adi, telefon, aciklama) VALUES (?, ?, ?)", 
-                                   (yeni_f_adi.strip(), yeni_f_tel.strip(), yeni_f_not.strip()))
-                    conn.commit()
+                    client.execute("INSERT INTO firmalar (firma_adi, telefon, aciklama) VALUES (?, ?, ?)", 
+                                   [yeni_f_adi.strip(), yeni_f_tel.strip(), yeni_f_not.strip()])
                     st.success(f"'{yeni_f_adi.strip()}' eklendi!")
                     st.rerun()
-                except sqlite3.IntegrityError:
-                    st.error("Bu firma zaten kayıtlı!")
+                except Exception:
+                    st.error("Bu firma zaten kayıtlı veya bir hata oluştu!")
                     
     else:
-        df_firmalar_all = pd.read_sql_query("SELECT id, firma_adi, telefon, aciklama FROM firmalar ORDER BY firma_adi ASC", conn)
+        df_firmalar_all = run_query_df("SELECT id, firma_adi, telefon, aciklama FROM firmalar ORDER BY firma_adi ASC")
         if not df_firmalar_all.empty:
             secili_f_id = st.selectbox("Düzenlenecek Firmayı Seçin:", 
                                        options=df_firmalar_all["id"], 
@@ -545,15 +539,13 @@ with tab3:
                 f_sil = st.form_submit_button("🗑️ Firmayı Sil")
                 
                 if f_guncelle:
-                    cursor.execute("UPDATE firmalar SET firma_adi=?, telefon=?, aciklama=? WHERE id=?", 
-                                   (e_f_adi.strip(), e_f_tel.strip(), e_f_not.strip(), secili_f_id))
-                    conn.commit()
+                    client.execute("UPDATE firmalar SET firma_adi=?, telefon=?, aciklama=? WHERE id=?", 
+                                   [e_f_adi.strip(), e_f_tel.strip(), e_f_not.strip(), int(secili_f_id)])
                     st.success("Firma güncellendi!")
                     st.rerun()
                     
                 if f_sil:
-                    cursor.execute("DELETE FROM firmalar WHERE id=?", (secili_f_id,))
-                    conn.commit()
+                    client.execute("DELETE FROM firmalar WHERE id=?", [int(secili_f_id)])
                     st.warning("Firma silindi!")
                     st.rerun()
         else:
@@ -561,7 +553,7 @@ with tab3:
 
     st.divider()
     st.write("**Kayıtlı Firmalar**")
-    df_f_list = pd.read_sql_query("SELECT firma_adi as 'Firma Adı', telefon as 'Telefon' FROM firmalar ORDER BY firma_adi ASC", conn)
+    df_f_list = run_query_df("SELECT firma_adi as 'Firma Adı', telefon as 'Telefon' FROM firmalar ORDER BY firma_adi ASC")
     st.dataframe(df_f_list, use_container_width=True)
 
 # ==========================================
@@ -570,7 +562,7 @@ with tab3:
 with tab4:
     st.subheader("📊 Firma Cari Ekstresi")
     
-    df_firmalar_cari = pd.read_sql_query("SELECT firma_adi FROM firmalar ORDER BY firma_adi ASC", conn)
+    df_firmalar_cari = run_query_df("SELECT firma_adi FROM firmalar ORDER BY firma_adi ASC")
     
     if not df_firmalar_cari.empty:
         firmalar_list = df_firmalar_cari["firma_adi"].tolist()
@@ -580,11 +572,11 @@ with tab4:
             st.divider()
             st.markdown(f"### 📌 {secili_firma_detay}")
             
-            df_f_satis = pd.read_sql_query("SELECT SUM(toplam_tutar) as t FROM toptan_satis WHERE firma_adi=? AND islem_turu='Satış'", conn, params=(secili_firma_detay,))
-            df_f_tahsilat = pd.read_sql_query("SELECT SUM(toplam_tutar) as t FROM toptan_satis WHERE firma_adi=? AND islem_turu='Tahsilat'", conn, params=(secili_firma_detay,))
+            df_f_satis = run_query_df("SELECT SUM(toplam_tutar) as t FROM toptan_satis WHERE firma_adi=? AND islem_turu='Satış'", [secili_firma_detay])
+            df_f_tahsilat = run_query_df("SELECT SUM(toplam_tutar) as t FROM toptan_satis WHERE firma_adi=? AND islem_turu='Tahsilat'", [secili_firma_detay])
             
-            tot_satis = df_f_satis['t'].iloc[0] or 0.0
-            tot_tahsilat = df_f_tahsilat['t'].iloc[0] or 0.0
+            tot_satis = df_f_satis['t'].iloc[0] if not df_f_satis.empty and pd.notnull(df_f_satis['t'].iloc[0]) else 0.0
+            tot_tahsilat = df_f_tahsilat['t'].iloc[0] if not df_f_tahsilat.empty and pd.notnull(df_f_tahsilat['t'].iloc[0]) else 0.0
             net_bakiye = tot_satis - tot_tahsilat
             
             col1, col2, col3 = st.columns(3)
@@ -601,17 +593,14 @@ with tab4:
                     st.metric("Net Bakiye", "0.00 TL", delta="Dengede")
                 
             st.write("**İşlem Geçmişi**")
-            df_ekstre = pd.read_sql_query("""
+            df_ekstre = run_query_df("""
                 SELECT tarih as 'Tarih', islem_turu as 'İşlem', adet as 'Adet', toplam_tutar as 'Tutar (TL)'
                 FROM toptan_satis 
                 WHERE firma_adi=? 
                 ORDER BY id DESC
-            """, conn, params=(secili_firma_detay,))
+            """, [secili_firma_detay])
             
             if not df_ekstre.empty:
                 st.dataframe(df_ekstre, use_container_width=True)
             else:
                 st.info("İşlem hareketi bulunmuyor.")
-
-# Veritabanı Bağlantısını Kapat
-conn.close()
