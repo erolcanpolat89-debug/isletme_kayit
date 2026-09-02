@@ -798,10 +798,8 @@ with tab2:
             st.subheader("Yeni Toptan İşlem")
             islem_turu = st.selectbox("İşlem Tipi", ["Satış (Borç Ekle)", "Tahsilat (Borç Düş/Alacak)"], key="toptan_islem_tipi_select")
 
-            # FIRMA SEÇİMİ VE ANLIK BAKİYE GÖSTERGESİ (GÜNCELLEME)
             secili_firma_toptan = st.selectbox("Firma Seçin", firma_listesi, key="toptan_firma_secim")
             
-            # Anlık Firma Bakiyesini Hesapla ve Göster
             if secili_firma_toptan:
                 df_f_s = run_query_df("SELECT SUM(toplam_tutar) as t FROM toptan_satis WHERE firma_adi=? AND islem_turu='Satış'", [secili_firma_toptan])
                 df_f_t = run_query_df("SELECT SUM(toplam_tutar) as t FROM toptan_satis WHERE firma_adi=? AND islem_turu='Tahsilat'", [secili_firma_toptan])
@@ -902,13 +900,15 @@ with tab2:
         elif islem_turu_toptan == "📄 Firma Ekstresi & PDF Al":
             st.subheader("📄 Kurumsal Firma Ekstresi ve Yazdırılabilir PDF Raporu")
             
-            col_f1, col_f2, col_f3 = st.columns([2, 1, 1])
+            col_f1, col_f2, col_f3, col_f4 = st.columns([2, 1, 1, 1.5])
             with col_f1:
                 secilen_firma = st.selectbox("Ekstresi Alınacak Firmayı Seçin:", firma_listesi, key="ekstre_firma_sec")
             with col_f2:
                 bas_tarih = st.date_input("Başlangıç Tarihi", datetime.now().replace(day=1), key="toptan_bas_tarih")
             with col_f3:
                 bit_tarih = st.date_input("Bitiş Tarihi", datetime.now(), key="toptan_bit_tarih")
+            with col_f4:
+                ekstre_tipi = st.radio("Ekstre Türü", ["🔍 Detaylı Ekstre", "📋 Detaysız / Özet Ekstre"], key="toptan_ekstre_tipi_sec", horizontal=True)
                 
             str_bas_tarih = bas_tarih.strftime("%Y-%m-%d")
             str_bit_tarih = bit_tarih.strftime("%Y-%m-%d")
@@ -934,14 +934,22 @@ with tab2:
                     st.metric("Güncel Bakiye (Kalan)", f"{bakiye:,.2f} TL", delta=f"{bakiye:,.2f} TL" if bakiye > 0 else "Ödendi")
                     
                 st.markdown("---")
-                st.dataframe(df_firma_hareket, use_container_width=True, hide_index=True)
+                
+                # Ekstre tipine göre ekranda gösterilecek tabloyu ayarlayalım
+                if ekstre_tipi == "🔍 Detaylı Ekstre":
+                    st.dataframe(df_firma_hareket, use_container_width=True, hide_index=True)
+                else:
+                    df_ozet_goruntu = df_firma_hareket[['tarih', 'islem_turu', 'toplam_tutar', 'aciklama']]
+                    st.dataframe(df_ozet_goruntu, use_container_width=True, hide_index=True)
                 
                 st.markdown("### 🖨️ PDF / Yazıcı Çıktısı")
-                st.info("Aşağıdaki butona tıkladığınızda açılan pencerede sağ üstten **'Hedef: PDF olarak kaydet'** seçeneğini seçerek müşterinize göndereceğiniz resmi ekstreyi saniyeler içinde PDF yapabilirsiniz.")
+                st.info(f"Seçilen ekstre türü: **{ekstre_tipi}**. 'Yazdır / PDF Olarak Kaydet' butonuna basarak çıktıyı alabilirsiniz.")
                 
+                # HTML Tablosu - Ekstre Tipine Göre Şekillenir
                 html_content = f"""
                 <div style="font-family: Arial, sans-serif; padding: 20px; color: #000; background: #fff;">
                     <h2 style="text-align: center; color: #333;">MİDYECİ ABLA - CARİ HESAP EKSTRESİ</h2>
+                    <p style="text-align: center; color: #555; font-size: 14px;"><b>Rapor Türü:</b> {ekstre_tipi}</p>
                     <hr>
                     <p><b>Firma Adı:</b> {secilen_firma}</p>
                     <p><b>Tarih Aralığı:</b> {str_bas_tarih} / {str_bit_tarih}</p>
@@ -952,8 +960,15 @@ with tab2:
                             <tr style="background-color: #f2f2f2;">
                                 <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Tarih</th>
                                 <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">İşlem Türü</th>
+                """
+                
+                if ekstre_tipi == "🔍 Detaylı Ekstre":
+                    html_content += """
                                 <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Adet</th>
                                 <th style="border: 1px solid #ddd; padding: 8px; text-align: right;">Birim Fiyat</th>
+                    """
+                
+                html_content += """
                                 <th style="border: 1px solid #ddd; padding: 8px; text-align: right;">Tutar</th>
                                 <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Açıklama</th>
                             </tr>
@@ -966,8 +981,14 @@ with tab2:
                             <tr>
                                 <td style="border: 1px solid #ddd; padding: 8px;">{row['tarih']}</td>
                                 <td style="border: 1px solid #ddd; padding: 8px;">{row['islem_turu']}</td>
+                    """
+                    if ekstre_tipi == "🔍 Detaylı Ekstre":
+                        html_content += f"""
                                 <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">{row['adet']}</td>
                                 <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">{row['birim_fiyat']:,.2f} TL</td>
+                        """
+                    
+                    html_content += f"""
                                 <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">{row['toplam_tutar']:,.2f} TL</td>
                                 <td style="border: 1px solid #ddd; padding: 8px;">{row['aciklama'] if pd.notna(row['aciklama']) else '-'}</td>
                             </tr>
