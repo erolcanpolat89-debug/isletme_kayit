@@ -3,6 +3,7 @@ import pandas as pd
 from datetime import datetime
 import libsql_client as libsql
 import base64
+from datetime import datetime, timedelta
 
 # Sayfa Ayarları
 st.set_page_config(
