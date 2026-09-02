@@ -373,38 +373,33 @@ with tab1:
         else:
             st.info("Bugüne ait henüz dükkan hareketi kaydedilmedi.")
 
-   elif islem_modu == "📅 Tarihe Göre Bul":
+    elif islem_modu == "📅 Tarihe Göre Bul":
         st.subheader("📅 Tarihe Göre Dükkan İşlemi Arama ve Özet")
         secilen_tarih = st.date_input("Sorgulanacak Tarih Seçin:", datetime.now(), key="dukkan_tarih_sorgu")
         str_tarih = secilen_tarih.strftime("%Y-%m-%d")
         
-        # O güne ait kayıtları çekiyoruz (saatli/saatsiz tüm kayıtları yakalamak için SUBSTR kullanıyoruz)
         df_dukkan_gun = run_query_df("SELECT * FROM dukkan_hareket WHERE SUBSTR(tarih, 1, 10) = ? ORDER BY id DESC", [str_tarih])
         
         if df_dukkan_gun.empty:
-            st.warning(f"🔍 {str_tarih} tarihine ait dükkan kaydı bulunamadı.")
+            st.warning(f"🔍 {str_tarih} tarihine ait dükkan kayıt bulunamadı.")
         else:
             st.success(f"📌 {str_tarih} Tarihindeki Kayıtlar ({len(df_dukkan_gun)} Adet)")
             
-            # --- ÖZET METRİKLERİ VE HESAPLAMALAR ---
-            # Sadece gelirleri baz alarak ciro ve ürün adetlerini hesaplayalım
+            # O güne ait gelirleri filtreleyip kategori bazlı özetleri çıkarıyoruz
             df_gelirler = df_dukkan_gun[df_dukkan_gun['islem_tipi'] == 'Günlük Satış (Gelir)']
             
             toplam_ciro = df_gelirler['tutar'].sum() if not df_gelirler.empty else 0.0
             
-            # Midye adetini bulma (Kategori 'Midye' olanlar)
             midye_df = df_gelirler[df_gelirler['kategori'] == 'Midye']
             toplam_midye = midye_df['miktar'].sum() if not midye_df.empty else 0
             
-            # Çiğ Köfte adetini bulma (Kategori 'Çiğ Köfte' olanlar)
             cig_kofte_df = df_gelirler[df_gelirler['kategori'] == 'Çiğ Köfte']
             toplam_cig_kofte = cig_kofte_df['miktar'].sum() if not cig_kofte_df.empty else 0
             
-            # İçecek adetini bulma (Kategori 'İçecek' olanlar)
             icecek_df = df_gelirler[df_gelirler['kategori'] == 'İçecek']
             toplam_icecek = icecek_df['miktar'].sum() if not icecek_df.empty else 0
 
-            # Metrik Kartları Gösterimi
+            # Metrik Kartları
             col1, col2, col3, col4 = st.columns(4)
             with col1:
                 st.metric("Seçilen Gün Ciro", f"{toplam_ciro:,.2f} TL")
@@ -416,7 +411,6 @@ with tab1:
                 st.metric("Toplam İçecek", f"{int(toplam_icecek):,} adet")
             
             st.markdown("---")
-            st.write("📋 **O Güne Ait Tüm İşlem Dökümü:**")
             st.dataframe(df_dukkan_gun, use_container_width=True)
 
     elif islem_modu == "📈 Dükkan Ekstresi":
