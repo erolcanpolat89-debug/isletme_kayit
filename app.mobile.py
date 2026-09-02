@@ -635,8 +635,7 @@ with tab1:
             GROUP BY kategori
         """, [str_bas, str_bit])
         
-        # 2. TOPTAN SATIŞLAR (Eğer veritabanında toptan tablosu ayrıysa 'toptan_hareket' olarak çekiyoruz)
-        # Not: Tablo ismin farklıysa buradaki 'toptan_hareket' kısmını güncelleyebilirsin abi.
+        # 2. TOPTAN SATIŞLAR
         try:
             df_toptan_satis = run_query_df("""
                 SELECT kategori, SUM(miktar) as toplam_adet, SUM(tutar) as toplam_tutar
@@ -656,7 +655,6 @@ with tab1:
             dukkan_toplam_ciro = 0.0
         else:
             dukkan_toplam_ciro = df_dukkan_satis['toplam_tutar'].sum()
-            # İçecek, Çiğ Köfte, Midye ve diğerlerini ayrı ayrı gösterelim
             st.dataframe(df_dukkan_satis.rename(columns={'kategori': 'Kategori', 'toplam_adet': 'Toplam Adet', 'toplam_tutar': 'Toplam Tutar (TL)'}), use_container_width=True, hide_index=True)
             st.metric("📦 Dükkan Toplam Ciro", f"{dukkan_toplam_ciro:,.2f} TL")
 
@@ -732,7 +730,7 @@ with tab1:
     df_dukkan_bugun = run_query_df("""
         SELECT SUM(miktar) as adet, SUM(tutar) as ciro 
         FROM dukkan_hareket 
-        WHERE SUBSTR(tarih, 1, 10) = ? AND kategori = 'Midye' AND islem_islem_tipi = 'Günlük Satış (Gelir)'
+        WHERE SUBSTR(tarih, 1, 10) = ? AND kategori = 'Midye' AND islem_tipi = 'Günlük Satış (Gelir)'
     """, [bugun_str])
     
     d_adet = df_dukkan_bugun['adet'].iloc[0] if not df_dukkan_bugun.empty and pd.notnull(df_dukkan_bugun['adet'].iloc[0]) else 0
