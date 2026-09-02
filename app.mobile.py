@@ -635,13 +635,13 @@ with tab1:
             GROUP BY kategori
         """, [str_bas, str_bit])
         
-        # 2. TOPTAN SATIŞLAR
+        # 2. TOPTAN SATIŞLAR (Doğru tablo: toptan_satis, doğru sütunlar: firma_adi, adet, toplam_tutar)
         try:
             df_toptan_satis = run_query_df("""
-                SELECT kategori, SUM(miktar) as toplam_adet, SUM(tutar) as toplam_tutar
-                FROM toptan_hareket
-                WHERE SUBSTR(tarih, 1, 10) BETWEEN ? AND ?
-                GROUP BY kategori
+                SELECT firma_adi as kategori, SUM(adet) as toplam_adet, SUM(toplam_tutar) as toplam_tutar
+                FROM toptan_satis
+                WHERE SUBSTR(tarih, 1, 10) BETWEEN ? AND ? AND (islem_turu = 'Satış' OR islem_turu LIKE 'Satış%')
+                GROUP BY firma_adi
             """, [str_bas, str_bit])
         except:
             df_toptan_satis = pd.DataFrame(columns=['kategori', 'toplam_adet', 'toplam_tutar'])
@@ -667,7 +667,7 @@ with tab1:
             toptan_toplam_ciro = 0.0
         else:
             toptan_toplam_ciro = df_toptan_satis['toplam_tutar'].sum()
-            st.dataframe(df_toptan_satis.rename(columns={'kategori': 'Kategori', 'toplam_adet': 'Toplam Adet', 'toplam_tutar': 'Toplam Tutar (TL)'}), use_container_width=True, hide_index=True)
+            st.dataframe(df_toptan_satis.rename(columns={'kategori': 'Firma Adı', 'toplam_adet': 'Toplam Adet', 'toplam_tutar': 'Toplam Tutar (TL)'}), use_container_width=True, hide_index=True)
             st.metric("💰 Toptan Toplam Ciro", f"{toptan_toplam_ciro:,.2f} TL")
 
         st.markdown("---")
@@ -675,7 +675,6 @@ with tab1:
         # --- GENEL TOPLAM ---
         genel_toplam_ciro = dukkan_toplam_ciro + toptan_toplam_ciro
         st.success(f"🎯 **GENEL TOPLAM CİRO ({str_bas} ➔ {str_bit}): {genel_toplam_ciro:,.2f} TL**")
-
     elif islem_modu == "📋 Tüm Kayıtları Yönet":
         st.subheader("📋 Dükkan Kayıtlarını Düzenle / Sil")
         df_dukkan_all = run_query_df("SELECT * FROM dukkan_hareket ORDER BY id DESC LIMIT 50")
