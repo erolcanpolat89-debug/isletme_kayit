@@ -840,7 +840,7 @@ with tab2:
                     st.success(f"{t_tur} kaydedildi!")
                     st.rerun()
 
-        elif islem_turu_toptan == "📅 Tarihe Göre Bul":
+       elif islem_turu_toptan == "📅 Tarihe Göre Bul":
             st.subheader("📅 Tarihe Göre Toptan İşlem Arama")
             
             col_t1, col_t2 = st.columns([1, 1])
@@ -851,7 +851,6 @@ with tab2:
                 
             str_tarih = secilen_tarih.strftime("%Y-%m-%d")
             
-            # Filtreye göre SQL sorgusunu şekillendirelim
             if islem_filtresi == "📦 Sadece Satışlar":
                 df_toptan_gun = run_query_df("SELECT id, firma_adi, tarih, islem_turu, adet, birim_fiyat, toplam_tutar, aciklama FROM toptan_satis WHERE tarih=? AND islem_turu='Satış' ORDER BY id DESC", [str_tarih])
             elif islem_filtresi == "💰 Sadece Tahsilatlar":
@@ -864,6 +863,18 @@ with tab2:
             else:
                 st.success(f"📌 {str_tarih} Tarihindeki Kayıtlar ({len(df_toptan_gun)} Adet - {islem_filtresi})")
                 st.dataframe(df_toptan_gun[['firma_adi', 'islem_turu', 'adet', 'toplam_tutar', 'aciklama']], use_container_width=True)
+                
+                # TOPLAM BİLGİLERİ ÖZET KARTLARI
+                toplam_adet_gun = df_toptan_gun['adet'].sum()
+                toplam_tutar_gun = df_toptan_gun['toplam_tutar'].sum()
+                
+                col_m1, col_m2, col_m3 = st.columns(3)
+                with col_m1:
+                    st.metric("Toplam İşlem Adedi", f"{len(df_toptan_gun)} Adet")
+                with col_m2:
+                    st.metric("Toplam Ürün (Adet)", f"{toplam_adet_gun:,} Adet")
+                with col_m3:
+                    st.metric("Toplam Tutar", f"{toplam_tutar_gun:,.2f} TL")
                 
                 st.divider()
                 st.write("**İşlem Düzenle / Sil**")
