@@ -792,7 +792,7 @@ with tab2:
     if not firma_listesi:
         st.warning("⚠️ Lütfen önce 'Firmalar' sekmesinden bir firma ekleyin!")
     else:
-        islem_turu_toptan = st.radio("İşlem Türü Seçin:", ["Yeni İşlem", "📅 Tarihe Göre Bul", "Tüm Kayıtları Yönet"], key="radio_toptan", horizontal=True)
+        islem_turu_toptan = st.radio("İşlem Türü Seçin:", ["Yeni İşlem", "📅 Tarihe Göre Bul", "📄 Firma Ekstresi & PDF Al", "Tüm Kayıtları Yönet"], key="radio_toptan", horizontal=True)
 
         if islem_turu_toptan == "Yeni İşlem":
             st.subheader("Yeni Toptan İşlem")
@@ -898,6 +898,112 @@ with tab2:
                         client.execute("DELETE FROM toptan_satis WHERE id=?", [int(secilen_id)])
                         st.warning("Kayıt silindi!")
                         st.rerun()
+
+        elif islem_turu_toptan == "📄 Firma Ekstresi & PDF Al":
+            st.subheader("📄 Kurumsal Firma Ekstresi ve Yazdırılabilir PDF Raporu")
+            
+            col_f1, col_f2, col_f3 = st.columns([2, 1, 1])
+            with col_f1:
+                secilen_firma = st.selectbox("Ekstresi Alınacak Firmayı Seçin:", firma_listesi, key="ekstre_firma_sec")
+            with col_f2:
+                bas_tarih = st.date_input("Başlangıç Tarihi", datetime.now().replace(day=1), key="toptan_bas_tarih")
+            with col_f3:
+                bit_tarih = st.date_input("Bitiş Tarihi", datetime.now(), key="toptan_bit_tarih")
+                
+            str_bas_tarih = bas_tarih.strftime("%Y-%m-%d")
+            str_bit_tarih = bit_tarih.strftime("%Y-%m-%d")
+            
+            df_firma_hareket = run_query_df("""
+                SELECT tarih, islem_turu, adet, birim_fiyat, toplam_tutar, aciklama 
+                FROM toptan_satis 
+                WHERE firma_adi = ? AND SUBSTR(tarih, 1, 10) BETWEEN ? AND ? 
+                ORDER BY id ASC
+            """, [secilen_firma, str_bas_tarih, str_bit_tarih])
+            
+            if not df_firma_hareket.empty:
+                toplam_satis = df_firma_hareket[df_firma_hareket['islem_turu'] == 'Satış']['toplam_tutar'].sum()
+                toplam_tahsilat = df_firma_hareket[df_firma_hareket['islem_turu'] == 'Tahsilat']['toplam_tutar'].sum()
+                bakiye = toplam_satis - toplam_tahsilat
+                
+                m1, m2, m3 = st.columns(3)
+                with m1:
+                    st.metric("Toplam Satış (Borç)", f"{toplam_satis:,.2f} TL")
+                with m2:
+                    st.metric("Yapılan Tahsilat", f"{toplam_tahsilat:,.2f} TL")
+                with m3:
+                    st.metric("Güncel Bakiye (Kalan)", f"{bakiye:,.2f} TL", delta=f"{bakiye:,.2f} TL" if bakiye > 0 else "Ödendi")
+                    
+                st.markdown("---")
+                st.dataframe(df_firma_hareket, use_container_width=True, hide_index=True)
+                
+                st.markdown("### 🖨️ PDF / Yazıcı Çıktısı")
+                st.info("Aşağıdaki butona tıkladığınızda açılan pencerede sağ üstten **'Hedef: PDF olarak kaydet'** seçeneğini seçerek müşterinize göndereceğiniz resmi ekstreyi saniyeler içinde PDF yapabilirsiniz.")
+                
+                html_content = f"""
+                <div style="font-family: Arial, sans-serif; padding: 20px; color: #000; background: #fff;">
+                    <h2 style="text-align: center; color: #333;">MİDYECİ ABLA - CARİ HESAP EKSTRESİ</h2>
+                    <hr>
+                    <p><b>Firma Adı:</b> {secilen_firma}</p>
+                    <p><b>Tarih Aralığı:</b> {str_bas_tarih} / {str_bit_tarih}</p>
+                    <p><b>Rapor Tarihi:</b> {datetime.now().strftime('%Y-%m-%d %H:%M')}</p>
+                    <br>
+                    <table style="width: 100%; border-collapse: collapse; border: 1px solid #ddd;">
+                        <thead>
+                            <tr style="background-color: #f2f2f2;">
+                                <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Tarih</th>
+                                <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">İşlem Türü</th>
+                                <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Adet</th>
+                                <th style="border: 1px solid #ddd; padding: 8px; text-align: right;">Birim Fiyat</th>
+                                <th style="border: 1px solid #ddd; padding: 8px; text-align: right;">Tutar</th>
+                                <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Açıklama</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                """
+                
+                for index, row in df_firma_hareket.iterrows():
+                    html_content += f"""
+                            <tr>
+                                <td style="border: 1px solid #ddd; padding: 8px;">{row['tarih']}</td>
+                                <td style="border: 1px solid #ddd; padding: 8px;">{row['islem_turu']}</td>
+                                <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">{row['adet']}</td>
+                                <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">{row['birim_fiyat']:,.2f} TL</td>
+                                <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">{row['toplam_tutar']:,.2f} TL</td>
+                                <td style="border: 1px solid #ddd; padding: 8px;">{row['aciklama'] if pd.notna(row['aciklama']) else '-'}</td>
+                            </tr>
+                    """
+                    
+                html_content += f"""
+                        </tbody>
+                    </table>
+                    <br>
+                    <h3>Özet Bilgiler:</h3>
+                    <p><b>Toplam Borç (Satış):</b> {toplam_satis:,.2f} TL</p>
+                    <p><b>Toplam Ödenen (Tahsilat):</b> {toplam_tahsilat:,.2f} TL</p>
+                    <p><b>Kalan Net Bakiye:</b> {bakiye:,.2f} TL</p>
+                    <br><br>
+                    <p style="text-align: center; color: #777; font-size: 12px;">Midyeci Abla - Toptan Satış ve Dağıtım Sistemi</p>
+                </div>
+                """
+                
+                import streamlit.components.v1 as components
+                
+                print_button_html = f"""
+                <script>
+                function printDiv() {{
+                    var printContents = `{html_content}`;
+                    var originalContents = document.body.innerHTML;
+                    document.body.innerHTML = printContents;
+                    window.print();
+                    document.body.innerHTML = originalContents;
+                    window.location.reload();
+                }}
+                </script>
+                <button onclick="printDiv()" style="background-color: #ff4b4b; color: white; padding: 12px 20px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; font-weight: bold;">🖨️ Yazdır / PDF Olarak Kaydet</button>
+                """
+                components.html(print_button_html, height=70)
+            else:
+                st.warning(f"🔍 {secilen_firma} firmasına ait seçilen tarih aralığında hareket bulunamadı.")
 
         else:
             st.subheader("Tüm Toptan Kayıtlarını Yönet")
