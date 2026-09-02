@@ -1070,7 +1070,7 @@ with tab2:
                 
                 with st.form("toptan_duzenle_form_arsiv"):
                     e_tur = st.selectbox("İşlem Türü", ["Satış", "Tahsilat"], index=0 if kayit_tum["islem_turu"] == "Satış" else 1, key="etur_arsiv")
-                    e_firma = st.selectbox("Firma Seçin", firma_listesi, index=firma_listesi.index(kayit__tum) if 'kayit_tum' in locals() and kayit_tum["firma_adi"] in firma_listesi else 0, key="efirma_arsiv")
+                    e_firma = st.selectbox("Firma Seçin", firma_listesi, index=firma_listesi.index(kayit_tum["firma_adi"]) if kayit_tum["firma_adi"] in firma_listesi else 0, key="efirma_arsiv")
                     e_tarih = st.date_input("Tarih", datetime.strptime(str(kayit_tum["tarih"]), "%Y-%m-%d"), key="etarih_arsiv")
                     
                     if e_tur == "Satış":
