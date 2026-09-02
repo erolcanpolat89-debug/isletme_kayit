@@ -324,7 +324,7 @@ bugun = datetime.now().strftime("%Y-%m-%d")
 with tab1:
     st.subheader("🏪 Dükkan Hareketleri & Ekstre")
     
-    islem_modu = st.radio("İşlem Seçin:", ["🔴 Yeni Hareket", "📅 Tarihe Göre Bul", "📈 Dükkan Ekstresi", "📋 Tüm Kayıtları Yönet"], horizontal=True)
+    islem_modu = st.radio("İşlem Seçin:", ["🔴 Yeni Hareket", "📅 Tarihe Göre Bul", "📈 Dükkan Ekstresi", "📊 Aylık Karşılaştırma", "📋 Tüm Kayıtları Yönet"], horizontal=True)
 
     if islem_modu == "🔴 Yeni Hareket":
         kategoriler = ["Midye", "Çiğ Köfte", "İçecek", "Dükkan Gideri", "Personel", "Diğer"]
@@ -365,7 +365,6 @@ with tab1:
         st.markdown("---")
         st.subheader("📋 Bugünün Dükkan Kayıtları")
         
-        # Sadece bugünün kayıtlarını getiren sorgu
         df_bugun_dukkan = run_query_df("SELECT * FROM dukkan_hareket WHERE SUBSTR(tarih, 1, 10) = ? ORDER BY id DESC", [bugun])
         
         if not df_bugun_dukkan.empty:
@@ -385,7 +384,6 @@ with tab1:
         else:
             st.success(f"📌 {str_tarih} Tarihindeki Kayıtlar ({len(df_dukkan_gun)} Adet)")
             
-            # O güne ait gelirleri filtreleyip kategori bazlı özetleri çıkarıyoruz
             df_gelirler = df_dukkan_gun[df_dukkan_gun['islem_tipi'] == 'Günlük Satış (Gelir)']
             
             toplam_ciro = df_gelirler['tutar'].sum() if not df_gelirler.empty else 0.0
@@ -399,7 +397,6 @@ with tab1:
             icecek_df = df_gelirler[df_gelirler['kategori'] == 'İçecek']
             toplam_icecek = icecek_df['miktar'].sum() if not icecek_df.empty else 0
 
-            # Metrik Kartları
             col1, col2, col3, col4 = st.columns(4)
             with col1:
                 st.metric("Seçilen Gün Ciro", f"{toplam_ciro:,.2f} TL")
@@ -413,7 +410,6 @@ with tab1:
             st.markdown("---")
             st.dataframe(df_dukkan_gun, use_container_width=True)
 
-            # --- GRAFİK VE YÜZDE DEĞİŞİM ANALİZİ ---
             st.markdown("---")
             
             col_slider1, col_slider2 = st.columns([2, 1])
@@ -468,6 +464,73 @@ with tab1:
             st.dataframe(df_tum_dukkan, use_container_width=True)
         else:
             st.info("Henüz dükkan hareketi bulunmuyor.")
+
+    elif islem_modu == "📊 Aylık Karşılaştırma":
+        st.subheader("📊 Bu Ay ve Geçen Ay Kıyaslama Raporu")
+        
+        bu_yil_ay = datetime.now().strftime("%Y-%m")
+        
+        bugun_dt = datetime.now()
+        gecen_ay_tarih = bugun_dt.replace(day=1) - timedelta(days=1)
+        gecen_yil_ay = gecen_ay_tarih.strftime("%Y-%m")
+        
+        df_bu_ay = run_query_df("""
+            SELECT SUM(tutar) as toplam_ciro,
+                   SUM(CASE WHEN kategori = 'Midye' THEN miktar ELSE 0 END) as toplam_midye,
+                   SUM(CASE WHEN kategori = 'Çiğ Köfte' THEN miktar ELSE 0 END) as toplam_cigkofte,
+                   SUM(CASE WHEN kategori = 'İçecek' THEN miktar ELSE 0 END) as toplam_icecek
+            FROM dukkan_hareket 
+            WHERE islem_tipi = 'Günlük Satış (Gelir)' AND SUBSTR(tarih, 1, 7) = ?
+        """, [bu_yil_ay])
+        
+        df_gecen_ay = run_query_df("""
+            SELECT SUM(tutar) as toplam_ciro,
+                   SUM(CASE WHEN kategori = 'Midye' THEN miktar ELSE 0 END) as toplam_midye,
+                   SUM(CASE WHEN kategori = 'Çiğ Köfte' THEN miktar ELSE 0 END) as toplam_cigkofte,
+                   SUM(CASE WHEN kategori = 'İçecek' THEN miktar ELSE 0 END) as toplam_icecek
+            FROM dukkan_hareket 
+            WHERE islem_tipi = 'Günlük Satış (Gelir)' AND SUBSTR(tarih, 1, 7) = ?
+        """, [gecen_yil_ay])
+        
+        bu_ciro = df_bu_ay.iloc[0]['toplam_ciro'] if not df_bu_ay.empty and df_bu_ay.iloc[0]['toplam_ciro'] is not None else 0.0
+        gecen_ciro = df_gecen_ay.iloc[0]['toplam_ciro'] if not df_gecen_ay.empty and df_gecen_ay.iloc[0]['toplam_ciro'] is not None else 0.0
+        
+        bu_midye = df_bu_ay.iloc[0]['toplam_midye'] if not df_bu_ay.empty and df_bu_ay.iloc[0]['toplam_midye'] is not None else 0
+        gecen_midye = df_gecen_ay.iloc[0]['toplam_midye'] if not df_gecen_ay.empty and df_gecen_ay.iloc[0]['toplam_midye'] is not None else 0
+
+        if gecen_ciro > 0:
+            ciro_degisim = ((bu_ciro - gecen_ciro) / gecen_ciro) * 100
+        else:
+            ciro_degisim = 100.0 if bu_ciro > 0 else 0.0
+
+        st.markdown(f"### 🗓️ {gecen_yil_ay} (Geçen Ay) ➔ {bu_yil_ay} (Bu Ay) Performans Özeti")
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Geçen Ay Ciro", f"{gecen_ciro:,.2f} TL")
+        with col2:
+            st.metric("Bu Ay Ciro", f"{bu_ciro:,.2f} TL", delta=f"%{ciro_degisim:+.1f}")
+        with col3:
+            st.metric("Ciro Farkı", f"{(bu_ciro - gecen_ciro):+,.2f} TL")
+            
+        st.markdown("---")
+        
+        st.subheader("📦 Ürün Bazlı Ay Karşılaştırması")
+        data_karsilastirma = {
+            "Kategori": ["Midye (Adet)", "Çiğ Köfte (Adet)", "İçecek (Adet)"],
+            f"Geçen Ay ({gecen_yil_ay})": [
+                int(gecen_midye), 
+                int(df_gecen_ay.iloc[0]['toplam_cigkofte'] if not df_gecen_ay.empty and df_gecen_ay.iloc[0]['toplam_cigkofte'] is not None else 0), 
+                int(df_gecen_ay.iloc[0]['toplam_icecek'] if not df_gecen_ay.empty and df_gecen_ay.iloc[0]['toplam_icecek'] is not None else 0)
+            ],
+            f"Bu Ay ({bu_yil_ay})": [
+                int(bu_midye), 
+                int(df_bu_ay.iloc[0]['toplam_cigkofte'] if not df_bu_ay.empty and df_bu_ay.iloc[0]['toplam_cigkofte'] is not None else 0), 
+                int(df_bu_ay.iloc[0]['toplam_icecek'] if not df_bu_ay.empty and df_bu_ay.iloc[0]['toplam_icecek'] is not None else 0)
+            ]
+        }
+        df_karsilastirma_tablo = pd.DataFrame(data_karsilastirma)
+        st.dataframe(df_karsilastirma_tablo, use_container_width=True, hide_index=True)
 
     elif islem_modu == "📋 Tüm Kayıtları Yönet":
         st.subheader("📋 Dükkan Kayıtlarını Düzenle / Sil")
