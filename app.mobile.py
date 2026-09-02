@@ -627,15 +627,25 @@ with tab1:
         str_bas = bas_tarih.strftime("%Y-%m-%d")
         str_bit = bit_tarih.strftime("%Y-%m-%d")
         
-        # 1. DÜKKAN SATIŞLARI (Gelir olanlar)
+        # 1. DÜKKAN SATIŞLARI (Midye ve Midye Dolma ifadelerini tek çatıda topluyoruz)
         df_dukkan_satis = run_query_df("""
-            SELECT kategori, SUM(miktar) as toplam_adet, SUM(tutar) as toplam_tutar
+            SELECT 
+                CASE 
+                    WHEN LOWER(kategori) LIKE '%midye%' OR LOWER(urun_adi) LIKE '%midye%' THEN 'Midye'
+                    ELSE kategori 
+                END as kategori, 
+                SUM(miktar) as toplam_adet, 
+                SUM(tutar) as toplam_tutar
             FROM dukkan_hareket
             WHERE SUBSTR(tarih, 1, 10) BETWEEN ? AND ? AND islem_tipi = 'Günlük Satış (Gelir)'
-            GROUP BY kategori
+            GROUP BY 
+                CASE 
+                    WHEN LOWER(kategori) LIKE '%midye%' OR LOWER(urun_adi) LIKE '%midye%' THEN 'Midye'
+                    ELSE kategori 
+                END
         """, [str_bas, str_bit])
         
-        # 2. TOPTAN SATIŞLAR (Doğru tablo: toptan_satis, doğru sütunlar: firma_adi, adet, toplam_tutar)
+        # 2. TOPTAN SATIŞLAR
         try:
             df_toptan_satis = run_query_df("""
                 SELECT firma_adi as kategori, SUM(adet) as toplam_adet, SUM(toplam_tutar) as toplam_tutar
@@ -669,6 +679,12 @@ with tab1:
             toptan_toplam_ciro = df_toptan_satis['toplam_tutar'].sum()
             st.dataframe(df_toptan_satis.rename(columns={'kategori': 'Firma Adı', 'toplam_adet': 'Toplam Adet', 'toplam_tutar': 'Toplam Tutar (TL)'}), use_container_width=True, hide_index=True)
             st.metric("💰 Toptan Toplam Ciro", f"{toptan_toplam_ciro:,.2f} TL")
+
+        st.markdown("---")
+        
+        # --- GENEL TOPLAM ---
+        genel_toplam_ciro = dukkan_toplam_ciro + toptan_toplam_ciro
+        st.success(f"🎯 **GENEL TOPLAM CİRO ({str_bas} ➔ {str_bit}): {genel_toplam_ciro:,.2f} TL**")
 
         st.markdown("---")
         
