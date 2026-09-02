@@ -413,6 +413,49 @@ with tab1:
             st.markdown("---")
             st.dataframe(df_dukkan_gun, use_container_width=True)
 
+            # --- GRAFİK VE YÜZDE DEĞİŞİM ANALİZİ ---
+            st.markdown("---")
+            st.subheader("📊 Son Günlerin Ciro ve Satış Trendi")
+
+            df_trend = run_query_df("""
+                SELECT SUBSTR(tarih, 1, 10) as gun, 
+                       SUM(tutar) as toplam_ciro,
+                       SUM(CASE WHEN kategori = 'Midye' THEN miktar ELSE 0 END) as toplam_midye
+                FROM dukkan_hareket 
+                WHERE islem_tipi = 'Günlük Satış (Gelir)'
+                GROUP BY gun 
+                ORDER BY gun DESC 
+                LIMIT 8
+            """)
+
+            if not df_trend.empty:
+                df_trend = df_trend.sort_values('gun').reset_index(drop=True)
+                df_chart = df_trend.set_index('gun')
+                st.bar_chart(df_chart['toplam_ciro'], color="#ff4b4b")
+                
+                if len(df_trend) >= 2:
+                    bugun_ciro = df_trend.iloc[-1]['toplam_ciro']
+                    dun_ciro = df_trend.iloc[-2]['toplam_ciro']
+                    bugun_tarih = df_trend.iloc[-1]['gun']
+                    dun_tarih = df_trend.iloc[-2]['gun']
+                    
+                    if dun_ciro > 0:
+                        yuzde_degisim = ((bugun_ciro - dun_ciro) / dun_ciro) * 100
+                    else:
+                        yuzde_degisim = 100.0 if bugun_ciro > 0 else 0.0
+                        
+                    st.markdown(f"📈 **Ciro Değişim Analizi ({dun_tarih} ➔ {bugun_tarih}):**")
+                    
+                    col_A, col_B, col_C = st.columns(3)
+                    with col_A:
+                        st.metric("Önceki Gün Ciro", f"{dun_ciro:,.2f} TL")
+                    with col_B:
+                        st.metric("Bugünkü Ciro", f"{bugun_ciro:,.2f} TL")
+                    with col_C:
+                        st.metric("Değişim Oranı", f"%{yuzde_degisim:+.1f}", delta=f"%{yuzde_degisim:+.1f}")
+            else:
+                st.info("📊 Grafik için henüz yeterli satış verisi bulunmuyor.")
+
     elif islem_modu == "📈 Dükkan Ekstresi":
         st.subheader("📈 Dükkan Gelir / Gider Özeti")
         df_tum_dukkan = run_query_df("SELECT islem_tipi, SUM(tutar) as toplam FROM dukkan_hareket GROUP BY islem_tipi")
