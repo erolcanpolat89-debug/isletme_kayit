@@ -840,7 +840,7 @@ with tab2:
                     st.success(f"{t_tur} kaydedildi!")
                     st.rerun()
 
-       elif islem_turu_toptan == "📅 Tarihe Göre Bul":
+      elif islem_turu_toptan == "📅 Tarihe Göre Bul":
             st.subheader("📅 Tarihe Göre Toptan İşlem Arama")
             
             col_t1, col_t2 = st.columns([1, 1])
