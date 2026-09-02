@@ -459,12 +459,59 @@ with tab1:
                 st.info("📊 Grafik için henüz yeterli satış verisi bulunmuyor.")
 
     elif islem_modu == "📈 Dükkan Ekstresi":
-        st.subheader("📈 Dükkan Gelir / Gider Özeti")
-        df_tum_dukkan = run_query_df("SELECT islem_tipi, SUM(tutar) as toplam FROM dukkan_hareket GROUP BY islem_tipi")
-        if not df_tum_dukkan.empty:
-            st.dataframe(df_tum_dukkan, use_container_width=True)
+        st.subheader("📈 Dükkan Ekstresi & Tarih Bazlı Detaylı Döküm")
+        
+        col_f1, col_f2 = st.columns(2)
+        with col_f1:
+            baslangic_tarihi = st.date_input("Başlangıç Tarihi", datetime.now() - timedelta(days=30), key="ekstre_bas_tarih")
+        with col_f2:
+            bitis_tarihi = st.date_input("Bitiş Tarihi", datetime.now(), key="ekstre_bit_tarih")
+            
+        str_bas = baslangic_tarihi.strftime("%Y-%m-%d")
+        str_bit = bitis_tarihi.strftime("%Y-%m-%d")
+        
+        # Seçilen tarih aralığındaki hareketleri çekelim
+        query_ekstre = """
+            SELECT * FROM dukkan_hareket 
+            WHERE SUBSTR(tarih, 1, 10) BETWEEN ? AND ? 
+            ORDER BY id DESC
+        """
+        df_ekstre = run_query_df(query_ekstre, [str_bas, str_bit])
+        
+        # Seçilen aralığın genel gelir/gider özeti
+        st.markdown("### 📊 Seçilen Aralık Gelir / Gider Özeti")
+        df_toplam_ozet = run_query_df("""
+            SELECT islem_tipi, SUM(tutar) as toplam_tutar 
+            FROM dukkan_hareket 
+            WHERE SUBSTR(tarih, 1, 10) BETWEEN ? AND ? 
+            GROUP BY islem_tipi
+        """, [str_bas, str_bit])
+        
+        if not df_toplam_ozet.empty:
+            st.dataframe(df_toplam_ozet, use_container_width=True, hide_index=True)
         else:
-            st.info("Henüz dükkan hareketi bulunmuyor.")
+            st.info("Seçilen tarih aralığında işlem bulunmuyor.")
+            
+        st.markdown("---")
+        st.subheader(f"📦 {str_bas} ➔ {str_bit} Arasındaki Giden Ürünler ve Detaylar")
+        
+        if not df_ekstre.empty:
+            # Ürün/Kategori bazlı giden toplam miktarlar (Sadece Satışlar)
+            df_urun_ozet = run_query_df("""
+                SELECT kategori, urun_adi, SUM(miktar) as toplam_miktar, SUM(tutar) as toplam_tutar 
+                FROM dukkan_hareket 
+                WHERE SUBSTR(tarih, 1, 10) BETWEEN ? AND ? AND islem_tipi = 'Günlük Satış (Gelir)'
+                GROUP BY kategori, urun_adi
+            """, [str_bas, str_bit])
+            
+            if not df_urun_ozet.empty:
+                st.markdown("**📌 Ürün Bazlı Toplam Satışlar (Neler Gitti?):**")
+                st.dataframe(df_urun_ozet, use_container_width=True, hide_index=True)
+            
+            st.markdown("**📋 Tüm İşlem Listesi:**")
+            st.dataframe(df_ekstre, use_container_width=True, hide_index=True)
+        else:
+            st.warning("Bu tarih aralığına ait kayıt bulunamadı.")
 
     elif islem_modu == "📊 Aylık Karşılaştırma":
         st.subheader("📊 İki Ayın Performans ve Ürün Kıyaslama Raporu")
