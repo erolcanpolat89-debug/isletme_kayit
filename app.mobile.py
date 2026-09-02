@@ -467,67 +467,85 @@ with tab1:
             st.info("Henüz dükkan hareketi bulunmuyor.")
 
     elif islem_modu == "📊 Aylık Karşılaştırma":
-        st.subheader("📊 Bu Ay ve Geçen Ay Kıyaslama Raporu")
+        st.subheader("📊 İki Ayın Performans ve Ürün Kıyaslama Raporu")
         
-        bu_yil_ay = datetime.now().strftime("%Y-%m")
-        
-        bugun_dt = datetime.now()
-        gecen_ay_tarih = bugun_dt.replace(day=1) - timedelta(days=1)
-        gecen_yil_ay = gecen_ay_tarih.strftime("%Y-%m")
-        
-        df_bu_ay = run_query_df("""
-            SELECT SUM(tutar) as toplam_ciro,
-                   SUM(CASE WHEN kategori = 'Midye' THEN miktar ELSE 0 END) as toplam_midye,
-                   SUM(CASE WHEN kategori = 'Çiğ Köfte' THEN miktar ELSE 0 END) as toplam_cigkofte,
-                   SUM(CASE WHEN kategori = 'İçecek' THEN miktar ELSE 0 END) as toplam_icecek
+        # Veritabanından mevcut kayıtlı olan tüm ayları çekelim
+        df_aylar = run_query_df("""
+            SELECT DISTINCT SUBSTR(tarih, 1, 7) as yil_ay 
             FROM dukkan_hareket 
-            WHERE islem_tipi = 'Günlük Satış (Gelir)' AND SUBSTR(tarih, 1, 7) = ?
-        """, [bu_yil_ay])
+            WHERE islem_tipi = 'Günlük Satış (Gelir)' 
+            ORDER BY yil_ay DESC
+        """)
         
-        df_gecen_ay = run_query_df("""
-            SELECT SUM(tutar) as toplam_ciro,
-                   SUM(CASE WHEN kategori = 'Midye' THEN miktar ELSE 0 END) as toplam_midye,
-                   SUM(CASE WHEN kategori = 'Çiğ Köfte' THEN miktar ELSE 0 END) as toplam_cigkofte,
-                   SUM(CASE WHEN kategori = 'İçecek' THEN miktar ELSE 0 END) as toplam_icecek
-            FROM dukkan_hareket 
-            WHERE islem_tipi = 'Günlük Satış (Gelir)' AND SUBSTR(tarih, 1, 7) = ?
-        """, [gecen_yil_ay])
-        
-        bu_ciro = df_bu_ay.iloc[0]['toplam_ciro'] if not df_bu_ay.empty and df_bu_ay.iloc[0]['toplam_ciro'] is not None else 0.0
-        gecen_ciro = df_gecen_ay.iloc[0]['toplam_ciro'] if not df_gecen_ay.empty and df_gecen_ay.iloc[0]['toplam_ciro'] is not None else 0.0
-        
-        bu_midye = df_bu_ay.iloc[0]['toplam_midye'] if not df_bu_ay.empty and df_bu_ay.iloc[0]['toplam_midye'] is not None else 0
-        gecen_midye = df_gecen_ay.iloc[0]['toplam_midye'] if not df_gecen_ay.empty and df_gecen_ay.iloc[0]['toplam_midye'] is not None else 0
-
-        if gecen_ciro > 0:
-            ciro_degisim = ((bu_ciro - gecen_ciro) / gecen_ciro) * 100
+        if not df_aylar.empty:
+            mevcut_aylar = df_aylar['yil_ay'].tolist()
         else:
-            ciro_degisim = 100.0 if bu_ciro > 0 else 0.0
+            mevcut_aylar = [datetime.now().strftime("%Y-%m")]
+            
+        col_sec1, col_sec2 = st.columns(2)
+        with col_sec1:
+            # 1. Ay Seçimi (Örn: Geçen Ay veya baz alınacak ay)
+            default_idx_1 = 1 if len(mevcut_aylar) > 1 else 0
+            secilen_ay_1 = st.selectbox("1. Ayı Seçin (Sol Taraf):", mevcut_aylar, index=default_idx_1, key="ay_secim_1")
+        with col_sec2:
+            # 2. Ay Seçimi (Örn: Bu Ay veya kıyaslanacak ay)
+            secilen_ay_2 = st.selectbox("2. Ayı Seçin (Sağ Taraf):", mevcut_aylar, index=0, key="ay_secim_2")
+        
+        # Seçilen 1. Ayın verilerini çek
+        df_ay1 = run_query_df("""
+            SELECT SUM(tutar) as toplam_ciro,
+                   SUM(CASE WHEN kategori = 'Midye' THEN miktar ELSE 0 END) as toplam_midye,
+                   SUM(CASE WHEN kategori = 'Çiğ Köfte' THEN miktar ELSE 0 END) as toplam_cigkofte,
+                   SUM(CASE WHEN kategori = 'İçecek' THEN miktar ELSE 0 END) as toplam_icecek
+            FROM dukkan_hareket 
+            WHERE islem_tipi = 'Günlük Satış (Gelir)' AND SUBSTR(tarih, 1, 7) = ?
+        """, [secilen_ay_1])
+        
+        # Seçilen 2. Ayın verilerini çek
+        df_ay2 = run_query_df("""
+            SELECT SUM(tutar) as toplam_ciro,
+                   SUM(CASE WHEN kategori = 'Midye' THEN miktar ELSE 0 END) as toplam_midye,
+                   SUM(CASE WHEN kategori = 'Çiğ Köfte' THEN miktar ELSE 0 END) as toplam_cigkofte,
+                   SUM(CASE WHEN kategori = 'İçecek' THEN miktar ELSE 0 END) as toplam_icecek
+            FROM dukkan_hareket 
+            WHERE islem_tipi = 'Günlük Satış (Gelir)' AND SUBSTR(tarih, 1, 7) = ?
+        """, [secilen_ay_2])
+        
+        ciro_1 = df_ay1.iloc[0]['toplam_ciro'] if not df_ay1.empty and df_ay1.iloc[0]['toplam_ciro'] is not None else 0.0
+        ciro_2 = df_ay2.iloc[0]['toplam_ciro'] if not df_ay2.empty and df_ay2.iloc[0]['toplam_ciro'] is not None else 0.0
+        
+        midye_1 = df_ay1.iloc[0]['toplam_midye'] if not df_ay1.empty and df_ay1.iloc[0]['toplam_midye'] is not None else 0
+        midye_2 = df_ay2.iloc[0]['toplam_midye'] if not df_ay2.empty and df_ay2.iloc[0]['toplam_midye'] is not None else 0
 
-        st.markdown(f"### 🗓️ {gecen_yil_ay} (Geçen Ay) ➔ {bu_yil_ay} (Bu Ay) Performans Özeti")
+        if ciro_1 > 0:
+            ciro_degisim = ((ciro_2 - ciro_1) / ciro_1) * 100
+        else:
+            ciro_degisim = 100.0 if ciro_2 > 0 else 0.0
+
+        st.markdown(f"### 🗓️ {secilen_ay_1} ➔ {secilen_ay_2} Performans Özeti")
         
         col1, col2, col3 = st.columns(3)
         with col1:
-            st.metric("Geçen Ay Ciro", f"{gecen_ciro:,.2f} TL")
+            st.metric(f"{secilen_ay_1} Ciro", f"{ciro_1:,.2f} TL")
         with col2:
-            st.metric("Bu Ay Ciro", f"{bu_ciro:,.2f} TL", delta=f"%{ciro_degisim:+.1f}")
+            st.metric(f"{secilen_ay_2} Ciro", f"{ciro_2:,.2f} TL", delta=f"%{ciro_degisim:+.1f}")
         with col3:
-            st.metric("Ciro Farkı", f"{(bu_ciro - gecen_ciro):+,.2f} TL")
+            st.metric("Ciro Farkı", f"{(ciro_2 - ciro_1):+,.2f} TL")
             
         st.markdown("---")
         
         st.subheader("📦 Ürün Bazlı Ay Karşılaştırması")
         data_karsilastirma = {
             "Kategori": ["Midye (Adet)", "Çiğ Köfte (Adet)", "İçecek (Adet)"],
-            f"Geçen Ay ({gecen_yil_ay})": [
-                int(gecen_midye), 
-                int(df_gecen_ay.iloc[0]['toplam_cigkofte'] if not df_gecen_ay.empty and df_gecen_ay.iloc[0]['toplam_cigkofte'] is not None else 0), 
-                int(df_gecen_ay.iloc[0]['toplam_icecek'] if not df_gecen_ay.empty and df_gecen_ay.iloc[0]['toplam_icecek'] is not None else 0)
+            f"{secilen_ay_1}": [
+                int(midye_1), 
+                int(df_ay1.iloc[0]['toplam_cigkofte'] if not df_ay1.empty and df_ay1.iloc[0]['toplam_cigkofte'] is not None else 0), 
+                int(df_ay1.iloc[0]['toplam_icecek'] if not df_ay1.empty and df_ay1.iloc[0]['toplam_icecek'] is not None else 0)
             ],
-            f"Bu Ay ({bu_yil_ay})": [
-                int(bu_midye), 
-                int(df_bu_ay.iloc[0]['toplam_cigkofte'] if not df_bu_ay.empty and df_bu_ay.iloc[0]['toplam_cigkofte'] is not None else 0), 
-                int(df_bu_ay.iloc[0]['toplam_icecek'] if not df_bu_ay.empty and df_bu_ay.iloc[0]['toplam_icecek'] is not None else 0)
+            f"{secilen_ay_2}": [
+                int(midye_2), 
+                int(df_ay2.iloc[0]['toplam_cigkofte'] if not df_ay2.empty and df_ay2.iloc[0]['toplam_cigkofte'] is not None else 0), 
+                int(df_ay2.iloc[0]['toplam_icecek'] if not df_ay2.empty and df_ay2.iloc[0]['toplam_icecek'] is not None else 0)
             ]
         }
         df_karsilastirma_tablo = pd.DataFrame(data_karsilastirma)
