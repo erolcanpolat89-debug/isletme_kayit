@@ -842,15 +842,27 @@ with tab2:
 
         elif islem_turu_toptan == "📅 Tarihe Göre Bul":
             st.subheader("📅 Tarihe Göre Toptan İşlem Arama")
-            secilen_tarih = st.date_input("Sorgulanacak Tarih Seçin:", datetime.now(), key="toptan_tarih_sorgu")
+            
+            col_t1, col_t2 = st.columns([1, 1])
+            with col_t1:
+                secilen_tarih = st.date_input("Sorgulanacak Tarih Seçin:", datetime.now(), key="toptan_tarih_sorgu")
+            with col_t2:
+                islem_filtresi = st.radio("İşlem Filtresi", ["🔄 Tümü", "📦 Sadece Satışlar", "💰 Sadece Tahsilatlar"], key="toptan_islem_filtresi", horizontal=True)
+                
             str_tarih = secilen_tarih.strftime("%Y-%m-%d")
             
-            df_toptan_gun = run_query_df("SELECT id, firma_adi, tarih, islem_turu, adet, birim_fiyat, toplam_tutar, aciklama FROM toptan_satis WHERE tarih=? ORDER BY id DESC", [str_tarih])
+            # Filtreye göre SQL sorgusunu şekillendirelim
+            if islem_filtresi == "📦 Sadece Satışlar":
+                df_toptan_gun = run_query_df("SELECT id, firma_adi, tarih, islem_turu, adet, birim_fiyat, toplam_tutar, aciklama FROM toptan_satis WHERE tarih=? AND islem_turu='Satış' ORDER BY id DESC", [str_tarih])
+            elif islem_filtresi == "💰 Sadece Tahsilatlar":
+                df_toptan_gun = run_query_df("SELECT id, firma_adi, tarih, islem_turu, adet, birim_fiyat, toplam_tutar, aciklama FROM toptan_satis WHERE tarih=? AND islem_turu='Tahsilat' ORDER BY id DESC", [str_tarih])
+            else:
+                df_toptan_gun = run_query_df("SELECT id, firma_adi, tarih, islem_turu, adet, birim_fiyat, toplam_tutar, aciklama FROM toptan_satis WHERE tarih=? ORDER BY id DESC", [str_tarih])
             
             if df_toptan_gun.empty:
-                st.warning(f"🔍 {str_tarih} tarihine ait toptan işlem kaydı bulunamadı.")
+                st.warning(f"🔍 {str_tarih} tarihinde seçilen filtreye uygun işlem kaydı bulunamadı.")
             else:
-                st.success(f"📌 {str_tarih} Tarihindeki Kayıtlar ({len(df_toptan_gun)} Adet)")
+                st.success(f"📌 {str_tarih} Tarihindeki Kayıtlar ({len(df_toptan_gun)} Adet - {islem_filtresi})")
                 st.dataframe(df_toptan_gun[['firma_adi', 'islem_turu', 'adet', 'toplam_tutar', 'aciklama']], use_container_width=True)
                 
                 st.divider()
@@ -858,7 +870,7 @@ with tab2:
                 secilen_id = st.selectbox(
                     "Düzenlenecek Kaydı Seçin:", 
                     options=df_toptan_gun["id"], 
-                    format_func=lambda x: f"ID:{x} - {df_toptan_gun[df_toptan_gun['id']==x]['firma_adi'].values[0]} ({df_toptan_gun[df_toptan_gun['id']==x]['toplam_tutar'].values[0]} TL)"
+                    format_func=lambda x: f"ID:{x} - {df_toptan_gun[df_toptan_gun['id']==x]['firma_adi'].values[0]} ({df_toptan_gun[df_toptan_gun['id']==x]['islem_turu'].values[0]} - {df_toptan_gun[df_toptan_gun['id']==x]['toplam_tutar'].values[0]} TL)"
                 )
                 
                 kayit = df_toptan_gun[df_toptan_gun["id"] == secilen_id].iloc[0]
