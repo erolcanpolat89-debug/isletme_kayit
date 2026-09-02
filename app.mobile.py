@@ -415,7 +415,12 @@ with tab1:
 
             # --- GRAFİK VE YÜZDE DEĞİŞİM ANALİZİ ---
             st.markdown("---")
-            st.subheader("📊 Son Günlerin Ciro ve Satış Trendi")
+            
+            col_slider1, col_slider2 = st.columns([2, 1])
+            with col_slider1:
+                st.subheader("📊 Ciro ve Satış Trendi")
+            with col_slider2:
+                gun_sayisi = st.slider("Trend Gün Sayısı:", min_value=3, max_value=30, value=7, key="trend_gun_slider")
 
             df_trend = run_query_df("""
                 SELECT SUBSTR(tarih, 1, 10) as gun, 
@@ -425,8 +430,8 @@ with tab1:
                 WHERE islem_tipi = 'Günlük Satış (Gelir)'
                 GROUP BY gun 
                 ORDER BY gun DESC 
-                LIMIT 8
-            """)
+                LIMIT ?
+            """, [gun_sayisi])
 
             if not df_trend.empty:
                 df_trend = df_trend.sort_values('gun').reset_index(drop=True)
@@ -434,23 +439,23 @@ with tab1:
                 st.bar_chart(df_chart['toplam_ciro'], color="#ff4b4b")
                 
                 if len(df_trend) >= 2:
-                    bugun_ciro = df_trend.iloc[-1]['toplam_ciro']
-                    dun_ciro = df_trend.iloc[-2]['toplam_ciro']
-                    bugun_tarih = df_trend.iloc[-1]['gun']
-                    dun_tarih = df_trend.iloc[-2]['gun']
+                    son_ciro = df_trend.iloc[-1]['toplam_ciro']
+                    bir_onceki_ciro = df_trend.iloc[-2]['toplam_ciro']
+                    son_tarih = df_trend.iloc[-1]['gun']
+                    bir_onceki_tarih = df_trend.iloc[-2]['gun']
                     
-                    if dun_ciro > 0:
-                        yuzde_degisim = ((bugun_ciro - dun_ciro) / dun_ciro) * 100
+                    if bir_onceki_ciro > 0:
+                        yuzde_degisim = ((son_ciro - bir_onceki_ciro) / bir_onceki_ciro) * 100
                     else:
-                        yuzde_degisim = 100.0 if bugun_ciro > 0 else 0.0
+                        yuzde_degisim = 100.0 if son_ciro > 0 else 0.0
                         
-                    st.markdown(f"📈 **Ciro Değişim Analizi ({dun_tarih} ➔ {bugun_tarih}):**")
+                    st.markdown(f"📈 **Son İki Günün Değişim Analizi ({bir_onceki_tarih} ➔ {son_tarih}):**")
                     
                     col_A, col_B, col_C = st.columns(3)
                     with col_A:
-                        st.metric("Önceki Gün Ciro", f"{dun_ciro:,.2f} TL")
+                        st.metric("Önceki Gün Ciro", f"{bir_onceki_ciro:,.2f} TL")
                     with col_B:
-                        st.metric("Bugünkü Ciro", f"{bugun_ciro:,.2f} TL")
+                        st.metric("Son Gün Ciro", f"{son_ciro:,.2f} TL")
                     with col_C:
                         st.metric("Değişim Oranı", f"%{yuzde_degisim:+.1f}", delta=f"%{yuzde_degisim:+.1f}")
             else:
