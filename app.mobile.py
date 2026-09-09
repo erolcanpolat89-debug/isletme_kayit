@@ -780,20 +780,28 @@ with tab2:
         ])
 
         # ---------------------------------------------------------
-        # 1. ALT SEKME: YENİ İŞLEM (Satış / Tahsilat Girişi)
+        # 1. ALT SEKME: YENİ İŞLEM (Satış / Tahsilat / Gider Girişi)
         # ---------------------------------------------------------
         with alt_sekme1:
             st.subheader("Yeni Toptan İşlem Girişi")
-            islem_turu = st.selectbox("İşlem Tipi", ["Satış (Borç Ekle)", "Tahsilat (Borç Düş/Alacak)"], key="toptan_islem_tipi_select_yeni")
+            islem_turu = st.selectbox(
+                "İşlem Tipi", 
+                ["Satış (Borç Ekle)", "Tahsilat (Borç Düş/Alacak)", "Gider / Masraf (Yol, Muhtelif vb.)"], 
+                key="toptan_islem_tipi_select_yeni"
+            )
 
             secili_firma_toptan = st.selectbox("Firma Seçin", firma_listesi, key="toptan_firma_secim_yeni")
             
             if secili_firma_toptan:
                 df_f_s = run_query_df("SELECT SUM(toplam_tutar) as t FROM toptan_satis WHERE firma_adi=? AND islem_turu='Satış'", [secili_firma_toptan])
+                df_f_g = run_query_df("SELECT SUM(toplam_tutar) as t FROM toptan_satis WHERE firma_adi=? AND islem_turu='Gider'", [secili_firma_toptan])
                 df_f_t = run_query_df("SELECT SUM(toplam_tutar) as t FROM toptan_satis WHERE firma_adi=? AND islem_turu='Tahsilat'", [secili_firma_toptan])
+                
                 f_s = df_f_s['t'].iloc[0] if not df_f_s.empty and pd.notnull(df_f_s['t'].iloc[0]) else 0.0
+                f_g = df_f_g['t'].iloc[0] if not df_f_g.empty and pd.notnull(df_f_g['t'].iloc[0]) else 0.0
                 f_t = df_f_t['t'].iloc[0] if not df_f_t.empty and pd.notnull(df_f_t['t'].iloc[0]) else 0.0
-                f_bakiye = f_s - f_t
+                
+                f_bakiye = (f_s + f_g) - f_t
                 
                 if f_bakiye > 0:
                     st.error(f"📌 **{secili_firma_toptan}** Güncel Durumu: **{f_bakiye:,.2f} TL BORÇLU**")
@@ -810,6 +818,11 @@ with tab2:
                     birim_fiyat = st.number_input("Birim Fiyat (TL)", min_value=0.0, step=0.5, value=15.0, format="%.2f")
                     toplam_tutar = adet * birim_fiyat
                     st.info(f"Hesaplanan Tutar: **{toplam_tutar:,.2f} TL**")
+                elif islem_turu == "Gider / Masraf (Yol, Muhtelif vb.)":
+                    adet = 1
+                    birim_fiyat = 0.0
+                    toplam_tutar = st.number_input("Masraf Tutarı (TL)", min_value=0.0, step=10.0, value=100.0, format="%.2f")
+                    st.warning(f"Masraf Tutarı: **{toplam_tutar:,.2f} TL**")
                 else:
                     adet = 0
                     birim_fiyat = 0.0
@@ -820,7 +833,13 @@ with tab2:
                 
                 kaydet = st.form_submit_button("💾 İşlemi Kaydet", type="primary")
                 if kaydet:
-                    t_tur = "Satış" if islem_turu == "Satış (Borç Ekle)" else "Tahsilat"
+                    if islem_turu == "Satış (Borç Ekle)":
+                        t_tur = "Satış"
+                    elif islem_turu == "Gider / Masraf (Yol, Muhtelif vb.)":
+                        t_tur = "Gider"
+                    else:
+                        t_tur = "Tahsilat"
+                        
                     client.execute("""
                         INSERT INTO toptan_satis (firma_adi, tarih, islem_turu, adet, birim_fiyat, toplam_tutar, aciklama)
                         VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -878,7 +897,7 @@ with tab2:
                 kayit_gun = df_toptan_gun[df_toptan_gun["id"] == secilen_id_gun].iloc[0]
                 
                 with st.form("toptan_gun_duzenle_form_temiz"):
-                    e_tur = st.selectbox("İşlem Türü", ["Satış", "Tahsilat"], index=0 if kayit_gun["islem_turu"] == "Satış" else 1)
+                    e_tur = st.selectbox("İşlem Türü", ["Satış", "Tahsilat", "Gider"], index=0 if kayit_gun["islem_turu"] == "Satış" else (1 if kayit_gun["islem_turu"] == "Tahsilat" else 2))
                     e_firma = st.selectbox("Firma Seçin", firma_listesi, index=firma_listesi.index(kayit_gun["firma_adi"]) if kayit_gun["firma_adi"] in firma_listesi else 0, key="efirma_gun")
                     e_tarih = st.date_input("Tarih", datetime.strptime(str(kayit_gun["tarih"]), "%Y-%m-%d"), key="etarih_gun")
                     
@@ -887,9 +906,9 @@ with tab2:
                         e_birim_fiyat = st.number_input("Birim Fiyat (TL)", min_value=0.0, step=0.5, value=float(kayit_gun["birim_fiyat"]), format="%.2f", key="ebirim_gun")
                         e_toplam = e_adet * e_birim_fiyat
                     else:
-                        e_adet = 0
+                        e_adet = 0 if e_tur == "Tahsilat" else 1
                         e_birim_fiyat = 0.0
-                        e_toplam = st.number_input("Tahsil Edilen Tutar (TL)", min_value=0.0, step=50.0, value=float(kayit_gun["toplam_tutar"]), format="%.2f", key="etahsilat_gun")
+                        e_toplam = st.number_input("Tutar (TL)", min_value=0.0, step=50.0, value=float(kayit_gun["toplam_tutar"]), format="%.2f", key="etahsilat_gun")
 
                     st.info(f"Güncel Tutar: **{e_toplam:,.2f} TL**")
                     e_aciklama = st.text_input("Açıklama", value=str(kayit_gun["aciklama"]) if kayit_gun["aciklama"] else "", key="eaciklama_gun")
@@ -912,7 +931,7 @@ with tab2:
                         st.rerun()
 
         # ---------------------------------------------------------
-        # 3. ALT SEKME: CARİ EKSTRE & PDF RAPORLAR
+        # 3. ALT SEKME: CARİ EKSTRE & PDF RAPORLAR (YÜRÜYEN BAKİYELİ)
         # ---------------------------------------------------------
         with alt_sekme3:
             st.subheader("📄 Kurumsal Firma Ekstresi ve PDF Çıktısı")
@@ -938,13 +957,28 @@ with tab2:
             """, [secilen_firma, str_bas_tarih, str_bit_tarih])
             
             if not df_firma_hareket.empty:
+                # Kümülatif (Yürüyen) Bakiye Hesaplama
+                kalan_bakiye_listesi = []
+                anlik_bakiye = 0.0
+                for _, row in df_firma_hareket.iterrows():
+                    tür = row['islem_turu']
+                    tutar = row['toplam_tutar']
+                    if tür in ['Satış', 'Gider']:
+                        anlik_bakiye += tutar
+                    elif tür == 'Tahsilat':
+                        anlik_bakiye -= tutar
+                    kalan_bakiye_listesi.append(anlik_bakiye)
+                
+                df_firma_hareket['Kalan Bakiye'] = kalan_bakiye_listesi
+
                 toplam_satis = df_firma_hareket[df_firma_hareket['islem_turu'] == 'Satış']['toplam_tutar'].sum()
+                toplam_gider = df_firma_hareket[df_firma_hareket['islem_turu'] == 'Gider']['toplam_tutar'].sum()
                 toplam_tahsilat = df_firma_hareket[df_firma_hareket['islem_turu'] == 'Tahsilat']['toplam_tutar'].sum()
-                bakiye = toplam_satis - toplam_tahsilat
+                bakiye = (toplam_satis + toplam_gider) - toplam_tahsilat
                 
                 m1, m2, m3 = st.columns(3)
                 with m1:
-                    st.metric("Toplam Satış (Borç)", f"{toplam_satis:,.2f} TL")
+                    st.metric("Toplam Borç (Satış+Gider)", f"{(toplam_satis + toplam_gider):,.2f} TL")
                 with m2:
                     st.metric("Yapılan Tahsilat", f"{toplam_tahsilat:,.2f} TL")
                 with m3:
@@ -955,7 +989,7 @@ with tab2:
                 if ekstre_tipi == "🔍 Detaylı":
                     st.dataframe(df_firma_hareket, use_container_width=True, hide_index=True)
                 else:
-                    st.dataframe(df_firma_hareket[['tarih', 'islem_turu', 'toplam_tutar', 'aciklama']], use_container_width=True, hide_index=True)
+                    st.dataframe(df_firma_hareket[['tarih', 'islem_turu', 'toplam_tutar', 'Kalan Bakiye', 'aciklama']], use_container_width=True, hide_index=True)
                 
                 st.markdown("### 🖨️ Yazıcı ve PDF İşlemi")
                 
@@ -980,6 +1014,7 @@ with tab2:
                     """
                 html_content += """
                                 <th style="border: 1px solid #ddd; padding: 8px; text-align: right;">Tutar</th>
+                                <th style="border: 1px solid #ddd; padding: 8px; text-align: right;">Kalan Bakiye</th>
                                 <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Açıklama</th>
                             </tr>
                         </thead>
@@ -998,6 +1033,7 @@ with tab2:
                         """
                     html_content += f"""
                                 <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">{row['toplam_tutar']:,.2f} TL</td>
+                                <td style="border: 1px solid #ddd; padding: 8px; text-align: right; font-weight: bold;">{row['Kalan Bakiye']:,.2f} TL</td>
                                 <td style="border: 1px solid #ddd; padding: 8px;">{row['aciklama'] if pd.notna(row['aciklama']) else '-'}</td>
                             </tr>
                     """
@@ -1006,7 +1042,7 @@ with tab2:
                     </table>
                     <br>
                     <h3>Özet:</h3>
-                    <p><b>Toplam Borç:</b> {toplam_satis:,.2f} TL</p>
+                    <p><b>Toplam Borç:</b> {(toplam_satis + toplam_gider):,.2f} TL</p>
                     <p><b>Toplam Tahsilat:</b> {toplam_tahsilat:,.2f} TL</p>
                     <p><b>Kalan Bakiye:</b> {bakiye:,.2f} TL</p>
                 </div>
@@ -1029,7 +1065,6 @@ with tab2:
                 components.html(print_button_html, height=70)
             else:
                 st.warning(f"🔍 {secilen_firma} firmasına ait bu tarih aralığında hareket bulunamadı.")
-
         # ---------------------------------------------------------
         # 4. ALT SEKME: TÜM KAYITLAR & GENEL YÖNETİM
         # ---------------------------------------------------------
