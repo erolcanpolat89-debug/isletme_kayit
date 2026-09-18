@@ -627,7 +627,6 @@ with tab1:
         str_bas = bas_tarih.strftime("%Y-%m-%d")
         str_bit = bit_tarih.strftime("%Y-%m-%d")
         
-        # 1. DÜKKAN SATIŞLARI (Midye ve Midye Dolma ifadelerini tek çatıda topluyoruz)
         df_dukkan_satis = run_query_df("""
             SELECT 
                 CASE 
@@ -645,7 +644,6 @@ with tab1:
                 END
         """, [str_bas, str_bit])
         
-        # 2. TOPTAN SATIŞLAR
         try:
             df_toptan_satis = run_query_df("""
                 SELECT firma_adi as kategori, SUM(adet) as toplam_adet, SUM(toplam_tutar) as toplam_tutar
@@ -658,7 +656,6 @@ with tab1:
 
         st.markdown("---")
         
-        # --- DÜKKAN ÖZETİ ---
         st.markdown("### 🏪 Dükkan Satışları")
         if df_dukkan_satis.empty:
             st.info("Seçilen tarih aralığında dükkan satış hareketi bulunamadı.")
@@ -670,7 +667,6 @@ with tab1:
 
         st.markdown("---")
 
-        # --- TOPTAN ÖZETİ ---
         st.markdown("### 📦 Toptan Satışları")
         if df_toptan_satis.empty:
             st.info("Seçilen tarih aralığında toptan satış hareketi bulunamadı.")
@@ -682,15 +678,9 @@ with tab1:
 
         st.markdown("---")
         
-        # --- GENEL TOPLAM ---
         genel_toplam_ciro = dukkan_toplam_ciro + toptan_toplam_ciro
         st.success(f"🎯 **GENEL TOPLAM CİRO ({str_bas} ➔ {str_bit}): {genel_toplam_ciro:,.2f} TL**")
 
-        st.markdown("---")
-        
-        # --- GENEL TOPLAM ---
-        genel_toplam_ciro = dukkan_toplam_ciro + toptan_toplam_ciro
-        st.success(f"🎯 **GENEL TOPLAM CİRO ({str_bas} ➔ {str_bit}): {genel_toplam_ciro:,.2f} TL**")
     elif islem_modu == "📋 Tüm Kayıtları Yönet":
         st.subheader("📋 Dükkan Kayıtlarını Düzenle / Sil")
         df_dukkan_all = run_query_df("SELECT * FROM dukkan_hareket ORDER BY id DESC LIMIT 50")
@@ -760,7 +750,6 @@ with tab1:
     st.write("**Son Dükkan Kayıtları**")
     df_dukkan_view = run_query_df("SELECT tarih as 'Tarih', kategori as 'Kategori', miktar as 'Adet', tutar as 'Tutar' FROM dukkan_hareket ORDER BY id DESC LIMIT 10")
     st.dataframe(df_dukkan_view, use_container_width=True)
-
 # ==========================================
 # 2. SEKME: TOPTAN (DÜZENLİ ALT SEKME YAPISI)
 # ==========================================
