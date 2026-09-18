@@ -23,7 +23,7 @@ def get_base64_image(image_path):
 
 img_base64 = get_base64_image("1000295034.png")
 
-# Koyu Tema & Arka Plan Logo
+# Koyu Tema & Arka Plan Logo-
 st.markdown(f"""
 <style>
     /* Ana Ekran Arka Planı */
