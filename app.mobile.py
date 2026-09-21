@@ -1499,53 +1499,53 @@ with alt_sekme3:
         </div>
         """
 
-        # -----------------------------------------------------
-        # 17. YAZDIR / PDF BUTONU
-        # -----------------------------------------------------
-        import streamlit.components.v1 as components
+       # -----------------------------------------------------
+# 17. YAZDIR / PDF BUTONU
+# -----------------------------------------------------
+import streamlit.components.v1 as components
 
-        print_button_html = f"""
-        <script>
+print_button_html = f"""
+<script>
 
-        function printDiv() {{
+function printDiv() {{
 
-            var printContents = `{html_content}`;
+    var printContents = `{html_content}`;
 
-            var originalContents = document.body.innerHTML;
+    var originalContents = document.body.innerHTML;
 
-            document.body.innerHTML = printContents;
+    document.body.innerHTML = printContents;
 
-            window.print();
+    window.print();
 
-            document.body.innerHTML = originalContents;
+    document.body.innerHTML = originalContents;
 
-            window.location.reload();
+    window.location.reload();
 
-        }}
+}}
 
-        </script>
+</script>
 
-        <button
-            onclick="printDiv()"
-            style="
-                background-color: #ff4b4b;
-                color: white;
-                padding: 12px 20px;
-                border: none;
-                border-radius: 5px;
-                cursor: pointer;
-                font-size: 16px;
-                font-weight: bold;
-            "
-        >
-            🖨️ Yazdır / PDF Olarak Kaydet
-        </button>
-        """
+<button
+    onclick="printDiv()"
+    style="
+        background-color: #ff4b4b;
+        color: white;
+        padding: 12px 20px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 16px;
+        font-weight: bold;
+    "
+>
+    🖨️ Yazdır / PDF Olarak Kaydet
+</button>
+"""
 
-        components.html(
-            print_button_html,
-            height=70
-        )
+components.html(
+    print_button_html,
+    height=70
+)
 
     else:
 
