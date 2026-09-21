@@ -1628,21 +1628,337 @@ with alt_sekme3:
 
 
         # =====================================================
-        # 16. PDF İNDİRME
-        # =====================================================
+# 16. PDF / YAZDIR / TELEFONDAN PDF OLARAK KAYDET
+# =====================================================
 
-        st.markdown("---")
+st.markdown("---")
+st.markdown("### 📥 Ekstreyi PDF Olarak Kaydet")
 
-        st.markdown("### 📥 PDF'yi Kaydet")
+import streamlit.components.v1 as components
 
-        st.download_button(
-            label="📥 Ekstreyi PDF Olarak İndir",
-            data=pdf_data,
-            file_name=dosya_adi,
-            mime="application/pdf",
-            use_container_width=True,
-            key="cari_ekstre_pdf_indir"
+# Ön izleme tablosunu PDF'de kullanmak için HTML oluştur
+pdf_html = f"""
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+
+<meta charset="UTF-8">
+
+<title>Firma Cari Ekstresi</title>
+
+<style>
+
+@page {{
+    size: A4;
+    margin: 12mm;
+}}
+
+body {{
+    font-family: Arial, "DejaVu Sans", sans-serif;
+    background: white;
+    color: black;
+    margin: 0;
+    padding: 20px;
+}}
+
+.baslik {{
+    text-align: center;
+    font-size: 22px;
+    font-weight: bold;
+    margin-bottom: 15px;
+}}
+
+.firma {{
+    font-size: 14px;
+    margin-bottom: 5px;
+}}
+
+.tarih {{
+    font-size: 14px;
+    margin-bottom: 15px;
+}}
+
+table {{
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 10px;
+}}
+
+th {{
+    background: #eeeeee;
+    border: 1px solid #777;
+    padding: 6px;
+    text-align: center;
+}}
+
+td {{
+    border: 1px solid #999;
+    padding: 5px;
+}}
+
+.sayi {{
+    text-align: right;
+}}
+
+.ozet {{
+    margin-top: 20px;
+    border-top: 2px solid #333;
+    padding-top: 10px;
+    font-size: 13px;
+}}
+
+@media print {{
+
+    .yazdir-butonu {{
+        display: none;
+    }}
+
+}}
+
+.yazdir-butonu {{
+    display: block;
+    margin: 0 auto 20px auto;
+    padding: 12px 22px;
+    background: #ff4b4b;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+}}
+
+</style>
+
+</head>
+
+<body>
+
+<button
+    class="yazdir-butonu"
+    onclick="window.print()"
+>
+    📥 PDF Olarak Kaydet / Yazdır
+</button>
+
+<div class="baslik">
+    MİDYECİ ABLA - CARİ HESAP EKSTRESİ
+</div>
+
+<div class="firma">
+    <b>Firma Adı:</b> {html.escape(str(secilen_firma))}
+</div>
+
+<div class="tarih">
+    <b>Tarih Aralığı:</b>
+    {str_bas_tarih} / {str_bit_tarih}
+</div>
+
+<table>
+
+<thead>
+<tr>
+
+<th>Tarih</th>
+<th>İşlem</th>
+<th>Adet</th>
+<th>Kümülatif Adet</th>
+"""
+
+if ekstre_tipi == "🔍 Detaylı":
+
+    pdf_html += """
+<th>Birim Fiyat</th>
+"""
+
+pdf_html += """
+<th>Tutar</th>
+<th>Kalan Bakiye</th>
+<th>Açıklama</th>
+
+</tr>
+</thead>
+
+<tbody>
+"""
+
+
+# =====================================================
+# PDF SATIRLARI
+# =====================================================
+
+for index, row in df_firma_hareket.iterrows():
+
+    tarih_pdf = html.escape(
+        str(row["tarih"])[:10]
+    )
+
+    islem_pdf = html.escape(
+        str(row["islem_turu"])
+    )
+
+    adet_pdf = int(
+        pd.to_numeric(
+            row["adet"],
+            errors="coerce"
+        ) or 0
+    )
+
+    kume_pdf = int(
+        pd.to_numeric(
+            row["Kümülatif_Adet"],
+            errors="coerce"
+        ) or 0
+    )
+
+    birim_pdf = float(
+        pd.to_numeric(
+            row["birim_fiyat"],
+            errors="coerce"
+        ) or 0
+    )
+
+    tutar_pdf = float(
+        pd.to_numeric(
+            row["toplam_tutar"],
+            errors="coerce"
+        ) or 0
+    )
+
+    bakiye_pdf = float(
+        pd.to_numeric(
+            row["Kalan_Bakiye"],
+            errors="coerce"
+        ) or 0
+    )
+
+    if pd.notna(row["aciklama"]):
+
+        aciklama_pdf = html.escape(
+            str(row["aciklama"])
         )
+
+    else:
+
+        aciklama_pdf = "-"
+
+
+    pdf_html += f"""
+<tr>
+
+<td>
+    {tarih_pdf}
+</td>
+
+<td>
+    {islem_pdf}
+</td>
+
+<td style="text-align:center;">
+    {adet_pdf:,}
+</td>
+
+<td style="text-align:center;">
+    {kume_pdf:,}
+</td>
+"""
+
+
+    if ekstre_tipi == "🔍 Detaylı":
+
+        pdf_html += f"""
+<td style="text-align:right;">
+    {birim_pdf:,.2f} TL
+</td>
+"""
+
+
+    pdf_html += f"""
+<td style="text-align:right;">
+    {tutar_pdf:,.2f} TL
+</td>
+
+<td style="
+    text-align:right;
+    font-weight:bold;
+">
+    {bakiye_pdf:,.2f} TL
+</td>
+
+<td>
+    {aciklama_pdf}
+</td>
+
+</tr>
+"""
+
+
+# =====================================================
+# PDF ÖZET
+# =====================================================
+
+pdf_html += f"""
+</tbody>
+
+</table>
+
+<div class="ozet">
+
+<h3>Ekstre Özeti</h3>
+
+<p>
+<b>Devir Bakiye:</b>
+{devir_bakiye:,.2f} TL
+</p>
+
+<p>
+<b>Dönem Toplam Satış:</b>
+{toplam_satis:,.2f} TL
+</p>
+
+<p>
+<b>Dönem Toplam Tahsilat:</b>
+{toplam_tahsilat:,.2f} TL
+</p>
+
+<p>
+<b>Dönem Satış Adedi:</b>
+{onizleme_satis_adedi:,} Adet
+</p>
+
+<p>
+<b>Kümülatif Toplam Adet:</b>
+{onizleme_kumulatif_adet:,} Adet
+</p>
+
+<p style="
+    font-size:16px;
+    font-weight:bold;
+    border-top:1px solid #777;
+    padding-top:8px;
+">
+
+<b>Kalan Bakiye:</b>
+{bakiye:,.2f} TL
+
+</p>
+
+</div>
+
+</body>
+</html>
+"""
+
+
+# =====================================================
+# PDF PENCERESİ
+# =====================================================
+
+components.html(
+    pdf_html,
+    height=90,
+    scrolling=False
+)
 
     else:
 
