@@ -675,151 +675,970 @@ with tab1:
 # 2. SEKME: TOPTAN (DÜZENLİ ALT SEKME YAPISI)
 # ==========================================
 with tab2:
-    df_firmalar_opt = run_query_df("SELECT firma_adi FROM firmalar ORDER BY firma_adi ASC")
-    firma_listesi = df_firmalar_opt["firma_adi"].tolist() if not df_firmalar_opt.empty else []
+
+    df_firmalar_opt = run_query_df(
+        "SELECT firma_adi FROM firmalar ORDER BY firma_adi ASC"
+    )
+
+    firma_listesi = (
+        df_firmalar_opt["firma_adi"].tolist()
+        if not df_firmalar_opt.empty
+        else []
+    )
 
     if not firma_listesi:
-        st.warning("⚠️ Lütfen önce 'Firmalar' sekmesinden bir firma ekleyin!")
+
+        st.warning(
+            "⚠️ Lütfen önce 'Firmalar' sekmesinden bir firma ekleyin!"
+        )
+
     else:
-        # ANA DAĞINIKLIĞI BİTİREN ALT SEKMELER
+
+        # =====================================================
+        # TOPTAN ALT SEKMELER
+        # =====================================================
         alt_sekme1, alt_sekme2, alt_sekme3, alt_sekme4 = st.tabs([
-            "➕ Yeni İşlem", 
-            "📅 Tarihe Göre İşlemler", 
-            "📄 Cari Ekstre & PDF", 
+            "➕ Yeni İşlem",
+            "📅 Tarihe Göre İşlemler",
+            "📄 Cari Ekstre & PDF",
             "⚙️ Tüm Kayıtlar & Yönetim"
         ])
 
-        # ---------------------------------------------------------
-        # 1. ALT SEKME: YENİ İŞLEM (Satış / Tahsilat Girişi)
-        # ---------------------------------------------------------
+
+        # =====================================================
+        # 1. ALT SEKME: YENİ İŞLEM
+        # =====================================================
         with alt_sekme1:
+
             st.subheader("Yeni Toptan İşlem Girişi")
-            islem_turu = st.selectbox("İşlem Tipi", ["Satış (Borç Ekle)", "Tahsilat (Borç Düş/Alacak)"], key="toptan_islem_tipi_select_yeni")
 
-            secili_firma_toptan = st.selectbox("Firma Seçin", firma_listesi, key="toptan_firma_secim_yeni")
-            
+            islem_turu = st.selectbox(
+                "İşlem Tipi",
+                [
+                    "Satış (Borç Ekle)",
+                    "Tahsilat (Borç Düş/Alacak)"
+                ],
+                key="toptan_islem_tipi_select_yeni"
+            )
+
+            secili_firma_toptan = st.selectbox(
+                "Firma Seçin",
+                firma_listesi,
+                key="toptan_firma_secim_yeni"
+            )
+
             if secili_firma_toptan:
-                df_f_s = run_query_df("SELECT SUM(toplam_tutar) as t FROM toptan_satis WHERE firma_adi=? AND islem_turu='Satış'", [secili_firma_toptan])
-                df_f_t = run_query_df("SELECT SUM(toplam_tutar) as t FROM toptan_satis WHERE firma_adi=? AND islem_turu='Tahsilat'", [secili_firma_toptan])
-                f_s = df_f_s['t'].iloc[0] if not df_f_s.empty and pd.notnull(df_f_s['t'].iloc[0]) else 0.0
-                f_t = df_f_t['t'].iloc[0] if not df_f_t.empty and pd.notnull(df_f_t['t'].iloc[0]) else 0.0
-                f_bakiye = f_s - f_t
-                
-                if f_bakiye > 0:
-                    st.error(f"📌 **{secili_firma_toptan}** Güncel Durumu: **{f_bakiye:,.2f} TL BORÇLU**")
-                elif f_bakiye < 0:
-                    st.success(f"📌 **{secili_firma_toptan}** Güncel Durumu: **{abs(f_bakiye):,.2f} TL ALACAKLI (Fazla Ödeme)**")
-                else:
-                    st.info(f"📌 **{secili_firma_toptan}** Güncel Durumu: **0.00 TL (Hesap Kapalı / Borcu Yok)**")
 
-            with st.form("toptan_form_duzenli", clear_on_submit=True):
-                tarih = st.date_input("İşlem Tarihi", datetime.now())
-                
-                if islem_turu == "Satış (Borç Ekle)":
-                    adet = st.number_input("Satılan Adet", min_value=1, step=50, value=100)
-                    birim_fiyat = st.number_input("Birim Fiyat (TL)", min_value=0.0, step=0.5, value=15.0, format="%.2f")
-                    toplam_tutar = adet * birim_fiyat
-                    st.info(f"Hesaplanan Tutar: **{toplam_tutar:,.2f} TL**")
+                df_f_s = run_query_df(
+                    """
+                    SELECT SUM(toplam_tutar) as t
+                    FROM toptan_satis
+                    WHERE firma_adi=?
+                      AND islem_turu='Satış'
+                    """,
+                    [secili_firma_toptan]
+                )
+
+                df_f_t = run_query_df(
+                    """
+                    SELECT SUM(toplam_tutar) as t
+                    FROM toptan_satis
+                    WHERE firma_adi=?
+                      AND islem_turu='Tahsilat'
+                    """,
+                    [secili_firma_toptan]
+                )
+
+                f_s = (
+                    df_f_s["t"].iloc[0]
+                    if not df_f_s.empty
+                    and pd.notnull(df_f_s["t"].iloc[0])
+                    else 0.0
+                )
+
+                f_t = (
+                    df_f_t["t"].iloc[0]
+                    if not df_f_t.empty
+                    and pd.notnull(df_f_t["t"].iloc[0])
+                    else 0.0
+                )
+
+                f_bakiye = f_s - f_t
+
+                if f_bakiye > 0:
+
+                    st.error(
+                        f"📌 **{secili_firma_toptan}** "
+                        f"Güncel Durumu: "
+                        f"**{f_bakiye:,.2f} TL BORÇLU**"
+                    )
+
+                elif f_bakiye < 0:
+
+                    st.success(
+                        f"📌 **{secili_firma_toptan}** "
+                        f"Güncel Durumu: "
+                        f"**{abs(f_bakiye):,.2f} TL ALACAKLI "
+                        f"(Fazla Ödeme)**"
+                    )
+
                 else:
+
+                    st.info(
+                        f"📌 **{secili_firma_toptan}** "
+                        f"Güncel Durumu: "
+                        f"**0.00 TL "
+                        f"(Hesap Kapalı / Borcu Yok)**"
+                    )
+
+            with st.form(
+                "toptan_form_duzenli",
+                clear_on_submit=True
+            ):
+
+                tarih = st.date_input(
+                    "İşlem Tarihi",
+                    datetime.now()
+                )
+
+                if islem_turu == "Satış (Borç Ekle)":
+
+                    adet = st.number_input(
+                        "Satılan Adet",
+                        min_value=1,
+                        step=50,
+                        value=100
+                    )
+
+                    birim_fiyat = st.number_input(
+                        "Birim Fiyat (TL)",
+                        min_value=0.0,
+                        step=0.5,
+                        value=15.0,
+                        format="%.2f"
+                    )
+
+                    toplam_tutar = adet * birim_fiyat
+
+                    st.info(
+                        f"Hesaplanan Tutar: "
+                        f"**{toplam_tutar:,.2f} TL**"
+                    )
+
+                else:
+
                     adet = 0
                     birim_fiyat = 0.0
-                    toplam_tutar = st.number_input("Tahsil Edilen Tutar (TL)", min_value=0.0, step=50.0, value=2430.0, format="%.2f")
-                    st.success(f"Tahsilat Tutarı: **{toplam_tutar:,.2f} TL**")
 
-                aciklama = st.text_input("Açıklama / Not")
-                
-                kaydet = st.form_submit_button("💾 İşlemi Kaydet", type="primary")
+                    toplam_tutar = st.number_input(
+                        "Tahsil Edilen Tutar (TL)",
+                        min_value=0.0,
+                        step=50.0,
+                        value=2430.0,
+                        format="%.2f"
+                    )
+
+                    st.success(
+                        f"Tahsilat Tutarı: "
+                        f"**{toplam_tutar:,.2f} TL**"
+                    )
+
+                aciklama = st.text_input(
+                    "Açıklama / Not"
+                )
+
+                kaydet = st.form_submit_button(
+                    "💾 İşlemi Kaydet",
+                    type="primary"
+                )
+
                 if kaydet:
-                    t_tur = "Satış" if islem_turu == "Satış (Borç Ekle)" else "Tahsilat"
-                    client.execute("""
-                        INSERT INTO toptan_satis (firma_adi, tarih, islem_turu, adet, birim_fiyat, toplam_tutar, aciklama)
+
+                    t_tur = (
+                        "Satış"
+                        if islem_turu == "Satış (Borç Ekle)"
+                        else "Tahsilat"
+                    )
+
+                    client.execute(
+                        """
+                        INSERT INTO toptan_satis
+                        (
+                            firma_adi,
+                            tarih,
+                            islem_turu,
+                            adet,
+                            birim_fiyat,
+                            toplam_tutar,
+                            aciklama
+                        )
                         VALUES (?, ?, ?, ?, ?, ?, ?)
-                    """, [secili_firma_toptan, tarih.strftime("%Y-%m-%d"), t_tur, adet, birim_fiyat, toplam_tutar, aciklama])
-                    st.success(f"{t_tur} başarıyla kaydedildi!")
+                        """,
+                        [
+                            secili_firma_toptan,
+                            tarih.strftime("%Y-%m-%d"),
+                            t_tur,
+                            adet,
+                            birim_fiyat,
+                            toplam_tutar,
+                            aciklama
+                        ]
+                    )
+
+                    st.success(
+                        f"✅ {t_tur} başarıyla kaydedildi!"
+                    )
+
                     st.rerun()
 
-        # ---------------------------------------------------------
-        # 2. ALT SEKME: TARİHE GÖRE İŞLEMLER (Süzme, Düzenleme, Silme)
-        # ---------------------------------------------------------
+
+        # =====================================================
+        # 2. ALT SEKME: TARİHE GÖRE İŞLEMLER
+        # =====================================================
         with alt_sekme2:
-            st.subheader("📅 Tarih Bazlı Arama ve Günlük Yönetim")
-            
+
+            st.subheader(
+                "📅 Tarih Bazlı Arama ve Günlük Yönetim"
+            )
+
             col_t1, col_t2 = st.columns([1, 1])
+
             with col_t1:
-                secilen_tarih = st.date_input("Sorgulanacak Tarih Seçin:", datetime.now(), key="toptan_tarih_sorgu_temiz")
+
+                secilen_tarih = st.date_input(
+                    "Sorgulanacak Tarih Seçin:",
+                    datetime.now(),
+                    key="toptan_tarih_sorgu_temiz"
+                )
+
             with col_t2:
-                islem_filtresi = st.radio("İşlem Filtresi", ["🔄 Tümü", "📦 Sadece Satışlar", "💰 Sadece Tahsilatlar"], key="toptan_islem_filtresi_temiz", horizontal=True)
-                
-            str_tarih = secilen_tarih.strftime("%Y-%m-%d")
-            
+
+                islem_filtresi = st.radio(
+                    "İşlem Filtresi",
+                    [
+                        "🔄 Tümü",
+                        "📦 Sadece Satışlar",
+                        "💰 Sadece Tahsilatlar"
+                    ],
+                    key="toptan_islem_filtresi_temiz",
+                    horizontal=True
+                )
+
+            str_tarih = secilen_tarih.strftime(
+                "%Y-%m-%d"
+            )
+
             if islem_filtresi == "📦 Sadece Satışlar":
-                df_toptan_gun = run_query_df("SELECT id, firma_adi, tarih, islem_turu, adet, birim_fiyat, toplam_tutar, aciklama FROM toptan_satis WHERE tarih=? AND islem_turu='Satış' ORDER BY id DESC", [str_tarih])
+
+                df_toptan_gun = run_query_df(
+                    """
+                    SELECT
+                        id,
+                        firma_adi,
+                        tarih,
+                        islem_turu,
+                        adet,
+                        birim_fiyat,
+                        toplam_tutar,
+                        aciklama
+                    FROM toptan_satis
+                    WHERE tarih=?
+                      AND islem_turu='Satış'
+                    ORDER BY id DESC
+                    """,
+                    [str_tarih]
+                )
+
             elif islem_filtresi == "💰 Sadece Tahsilatlar":
-                df_toptan_gun = run_query_df("SELECT id, firma_adi, tarih, islem_turu, adet, birim_fiyat, toplam_tutar, aciklama FROM toptan_satis WHERE tarih=? AND islem_turu='Tahsilat' ORDER BY id DESC", [str_tarih])
+
+                df_toptan_gun = run_query_df(
+                    """
+                    SELECT
+                        id,
+                        firma_adi,
+                        tarih,
+                        islem_turu,
+                        adet,
+                        birim_fiyat,
+                        toplam_tutar,
+                        aciklama
+                    FROM toptan_satis
+                    WHERE tarih=?
+                      AND islem_turu='Tahsilat'
+                    ORDER BY id DESC
+                    """,
+                    [str_tarih]
+                )
+
             else:
-                df_toptan_gun = run_query_df("SELECT id, firma_adi, tarih, islem_turu, adet, birim_fiyat, toplam_tutar, aciklama FROM toptan_satis WHERE tarih=? ORDER BY id DESC", [str_tarih])
-            
+
+                df_toptan_gun = run_query_df(
+                    """
+                    SELECT
+                        id,
+                        firma_adi,
+                        tarih,
+                        islem_turu,
+                        adet,
+                        birim_fiyat,
+                        toplam_tutar,
+                        aciklama
+                    FROM toptan_satis
+                    WHERE tarih=?
+                    ORDER BY id DESC
+                    """,
+                    [str_tarih]
+                )
+
             if df_toptan_gun.empty:
-                st.warning(f"🔍 {str_tarih} tarihinde seçilen filtreye uygun işlem kaydı bulunamadı.")
+
+                st.warning(
+                    f"🔍 {str_tarih} tarihinde seçilen filtreye "
+                    f"uygun işlem kaydı bulunamadı."
+                )
+
             else:
-                st.success(f"📌 {str_tarih} Tarihindeki Kayıtlar ({len(df_toptan_gun)} Adet)")
-                st.dataframe(df_toptan_gun[['firma_adi', 'islem_turu', 'adet', 'toplam_tutar', 'aciklama']], use_container_width=True)
-                
-                toplam_adet_gun = df_toptan_gun['adet'].sum()
-                toplam_tutar_gun = df_toptan_gun['toplam_tutar'].sum()
-                
+
+                st.success(
+                    f"📌 {str_tarih} Tarihindeki Kayıtlar "
+                    f"({len(df_toptan_gun)} Adet)"
+                )
+
+                st.dataframe(
+                    df_toptan_gun[
+                        [
+                            "firma_adi",
+                            "islem_turu",
+                            "adet",
+                            "toplam_tutar",
+                            "aciklama"
+                        ]
+                    ],
+                    use_container_width=True
+                )
+
+                toplam_adet_gun = df_toptan_gun[
+                    "adet"
+                ].sum()
+
+                toplam_tutar_gun = df_toptan_gun[
+                    "toplam_tutar"
+                ].sum()
+
                 col_m1, col_m2, col_m3 = st.columns(3)
+
                 with col_m1:
-                    st.metric("İşlem Adedi", f"{len(df_toptan_gun)} Adet")
+
+                    st.metric(
+                        "İşlem Adedi",
+                        f"{len(df_toptan_gun)} Adet"
+                    )
+
                 with col_m2:
-                    st.metric("Toplam Ürün", f"{toplam_adet_gun:,} Adet")
+
+                    st.metric(
+                        "Toplam Ürün",
+                        f"{toplam_adet_gun:,} Adet"
+                    )
+
                 with col_m3:
-                    st.metric("Toplam Tutar", f"{toplam_tutar_gun:,.2f} TL")
-                
+
+                    st.metric(
+                        "Toplam Tutar",
+                        f"{toplam_tutar_gun:,.2f} TL"
+                    )
+
                 st.divider()
-                st.write("**Seçilen Günkü Kaydı Düzenle / Sil**")
+
+                st.write(
+                    "**Seçilen Günkü Kaydı Düzenle / Sil**"
+                )
+
                 secilen_id_gun = st.selectbox(
-                    "İşlem Seçin:", 
-                    options=df_toptan_gun["id"], 
-                    format_func=lambda x: f"ID:{x} - {df_toptan_gun[df_toptan_gun['id']==x]['firma_adi'].values[0]} ({df_toptan_gun[df_toptan_gun['id']==x]['islem_turu'].values[0]} - {df_toptan_gun[df_toptan_gun['id']==x]['toplam_tutar'].values[0]} TL)",
+                    "İşlem Seçin:",
+                    options=df_toptan_gun["id"],
+                    format_func=lambda x:
+                        f"ID:{x} - "
+                        f"{df_toptan_gun[df_toptan_gun['id'] == x]['firma_adi'].values[0]} "
+                        f"("
+                        f"{df_toptan_gun[df_toptan_gun['id'] == x]['islem_turu'].values[0]} "
+                        f"- "
+                        f"{df_toptan_gun[df_toptan_gun['id'] == x]['toplam_tutar'].values[0]} TL"
+                        f")",
                     key="sec_id_gunluk"
                 )
-                
-                kayit_gun = df_toptan_gun[df_toptan_gun["id"] == secilen_id_gun].iloc[0]
-                
-                with st.form("toptan_gun_duzenle_form_temiz"):
-                    e_tur = st.selectbox("İşlem Türü", ["Satış", "Tahsilat"], index=0 if kayit_gun["islem_turu"] == "Satış" else 1)
-                    e_firma = st.selectbox("Firma Seçin", firma_listesi, index=firma_listesi.index(kayit_gun["firma_adi"]) if kayit_gun["firma_adi"] in firma_listesi else 0, key="efirma_gun")
-                    e_tarih = st.date_input("Tarih", datetime.strptime(str(kayit_gun["tarih"]), "%Y-%m-%d"), key="etarih_gun")
-                    
+
+                kayit_gun = df_toptan_gun[
+                    df_toptan_gun["id"] == secilen_id_gun
+                ].iloc[0]
+
+                with st.form(
+                    "toptan_gun_duzenle_form_temiz"
+                ):
+
+                    e_tur = st.selectbox(
+                        "İşlem Türü",
+                        ["Satış", "Tahsilat"],
+                        index=(
+                            0
+                            if kayit_gun["islem_turu"] == "Satış"
+                            else 1
+                        )
+                    )
+
+                    e_firma = st.selectbox(
+                        "Firma Seçin",
+                        firma_listesi,
+                        index=(
+                            firma_listesi.index(
+                                kayit_gun["firma_adi"]
+                            )
+                            if kayit_gun["firma_adi"]
+                            in firma_listesi
+                            else 0
+                        ),
+                        key="efirma_gun"
+                    )
+
+                    e_tarih = st.date_input(
+                        "Tarih",
+                        datetime.strptime(
+                            str(kayit_gun["tarih"]),
+                            "%Y-%m-%d"
+                        ),
+                        key="etarih_gun"
+                    )
+
                     if e_tur == "Satış":
-                        e_adet = st.number_input("Adet", min_value=0, step=50, value=int(kayit_gun["adet"]), key="eadet_gun")
-                        e_birim_fiyat = st.number_input("Birim Fiyat (TL)", min_value=0.0, step=0.5, value=float(kayit_gun["birim_fiyat"]), format="%.2f", key="ebirim_gun")
-                        e_toplam = e_adet * e_birim_fiyat
+
+                        e_adet = st.number_input(
+                            "Adet",
+                            min_value=0,
+                            step=50,
+                            value=int(
+                                kayit_gun["adet"]
+                            ),
+                            key="eadet_gun"
+                        )
+
+                        e_birim_fiyat = st.number_input(
+                            "Birim Fiyat (TL)",
+                            min_value=0.0,
+                            step=0.5,
+                            value=float(
+                                kayit_gun["birim_fiyat"]
+                            ),
+                            format="%.2f",
+                            key="ebirim_gun"
+                        )
+
+                        e_toplam = (
+                            e_adet * e_birim_fiyat
+                        )
+
                     else:
+
                         e_adet = 0
                         e_birim_fiyat = 0.0
-                        e_toplam = st.number_input("Tahsil Edilen Tutar (TL)", min_value=0.0, step=50.0, value=float(kayit_gun["toplam_tutar"]), format="%.2f", key="etahsilat_gun")
 
-                    st.info(f"Güncel Tutar: **{e_toplam:,.2f} TL**")
-                    e_aciklama = st.text_input("Açıklama", value=str(kayit_gun["aciklama"]) if kayit_gun["aciklama"] else "", key="eaciklama_gun")
-                    
-                    guncelle_g = st.form_submit_button("✏️ Güncelle", type="primary")
-                    sil_g = st.form_submit_button("🗑️ Sil")
-                    
+                        e_toplam = st.number_input(
+                            "Tahsil Edilen Tutar (TL)",
+                            min_value=0.0,
+                            step=50.0,
+                            value=float(
+                                kayit_gun["toplam_tutar"]
+                            ),
+                            format="%.2f",
+                            key="etahsilat_gun"
+                        )
+
+                    st.info(
+                        f"Güncel Tutar: "
+                        f"**{e_toplam:,.2f} TL**"
+                    )
+
+                    e_aciklama = st.text_input(
+                        "Açıklama",
+                        value=(
+                            str(kayit_gun["aciklama"])
+                            if kayit_gun["aciklama"]
+                            else ""
+                        ),
+                        key="eaciklama_gun"
+                    )
+
+                    guncelle_g = st.form_submit_button(
+                        "✏️ Güncelle",
+                        type="primary"
+                    )
+
+                    sil_g = st.form_submit_button(
+                        "🗑️ Sil"
+                    )
+
                     if guncelle_g:
-                        client.execute("""
-                            UPDATE toptan_satis 
-                            SET firma_adi=?, tarih=?, islem_turu=?, adet=?, birim_fiyat=?, toplam_tutar=?, aciklama=? 
+
+                        client.execute(
+                            """
+                            UPDATE toptan_satis
+                            SET
+                                firma_adi=?,
+                                tarih=?,
+                                islem_turu=?,
+                                adet=?,
+                                birim_fiyat=?,
+                                toplam_tutar=?,
+                                aciklama=?
                             WHERE id=?
-                        """, [e_firma, e_tarih.strftime("%Y-%m-%d"), e_tur, e_adet, e_birim_fiyat, e_toplam, e_aciklama, int(secilen_id_gun)])
-                        st.success("Kayıt güncellendi!")
+                            """,
+                            [
+                                e_firma,
+                                e_tarih.strftime(
+                                    "%Y-%m-%d"
+                                ),
+                                e_tur,
+                                e_adet,
+                                e_birim_fiyat,
+                                e_toplam,
+                                e_aciklama,
+                                int(secilen_id_gun)
+                            ]
+                        )
+
+                        st.success(
+                            "✅ Kayıt güncellendi!"
+                        )
+
                         st.rerun()
-                        
+
                     if sil_g:
-                        client.execute("DELETE FROM toptan_satis WHERE id=?", [int(secilen_id_gun)])
-                        st.warning("Kayıt silindi!")
+
+                        client.execute(
+                            "DELETE FROM toptan_satis WHERE id=?",
+                            [int(secilen_id_gun)]
+                        )
+
+                        st.warning(
+                            "🗑️ Kayıt silindi!"
+                        )
+
                         st.rerun()
+
+
+        # =====================================================
+        # 3. ALT SEKME: CARİ EKSTRE & PDF
+        # =====================================================
+        #
+        # BURASI SENİN MEVCUT CARİ EKSTRE & PDF KODUNUN YERİ.
+        #
+        # Eğer mevcut kodunda zaten:
+        #
+        # with alt_sekme3:
+        #
+        # diye başlayan Cari Ekstre & PDF bölümü varsa,
+        # ONU BURAYA AYNEN KOY.
+        #
+        # =====================================================
+
+
+        # =====================================================
+        # 4. ALT SEKME: TÜM KAYITLAR & YÖNETİM
+        # =====================================================
+        with alt_sekme4:
+
+            st.subheader(
+                "⚙️ Tüm Toptan Kayıtlar ve Yönetim"
+            )
+
+            # -------------------------------------------------
+            # TÜM KAYITLARI ÇEK
+            # -------------------------------------------------
+            df_tum_kayitlar = run_query_df(
+                """
+                SELECT
+                    id,
+                    firma_adi,
+                    tarih,
+                    islem_turu,
+                    adet,
+                    birim_fiyat,
+                    toplam_tutar,
+                    aciklama
+                FROM toptan_satis
+                ORDER BY tarih DESC, id DESC
+                """
+            )
+
+            if df_tum_kayitlar.empty:
+
+                st.info(
+                    "📭 Henüz hiçbir toptan işlem kaydı bulunmuyor."
+                )
+
+            else:
+
+                # -------------------------------------------------
+                # GENEL TOPLAMLAR
+                # -------------------------------------------------
+                toplam_satis = df_tum_kayitlar.loc[
+                    df_tum_kayitlar["islem_turu"] == "Satış",
+                    "toplam_tutar"
+                ].sum()
+
+                toplam_tahsilat = df_tum_kayitlar.loc[
+                    df_tum_kayitlar["islem_turu"] == "Tahsilat",
+                    "toplam_tutar"
+                ].sum()
+
+                toplam_adet = df_tum_kayitlar.loc[
+                    df_tum_kayitlar["islem_turu"] == "Satış",
+                    "adet"
+                ].sum()
+
+                kalan_bakiye = (
+                    toplam_satis - toplam_tahsilat
+                )
+
+                st.success(
+                    f"📌 Toplam {len(df_tum_kayitlar)} adet "
+                    f"toptan işlem kaydı bulundu."
+                )
+
+                col_y1, col_y2, col_y3, col_y4 = st.columns(4)
+
+                with col_y1:
+
+                    st.metric(
+                        "📦 Toplam Satış",
+                        f"{toplam_satis:,.2f} TL"
+                    )
+
+                with col_y2:
+
+                    st.metric(
+                        "💰 Toplam Tahsilat",
+                        f"{toplam_tahsilat:,.2f} TL"
+                    )
+
+                with col_y3:
+
+                    st.metric(
+                        "📦 Toplam Ürün",
+                        f"{toplam_adet:,} Adet"
+                    )
+
+                with col_y4:
+
+                    st.metric(
+                        "💳 Kalan Bakiye",
+                        f"{kalan_bakiye:,.2f} TL"
+                    )
+
+                st.divider()
+
+                # -------------------------------------------------
+                # FİLTRELER
+                # -------------------------------------------------
+                col_f1, col_f2 = st.columns(2)
+
+                with col_f1:
+
+                    yonetim_firma = st.selectbox(
+                        "🏢 Firma Filtresi",
+                        ["Tümü"] + firma_listesi,
+                        key="yonetim_firma_filtresi"
+                    )
+
+                with col_f2:
+
+                    yonetim_islem = st.selectbox(
+                        "🔄 İşlem Türü",
+                        [
+                            "Tümü",
+                            "Satış",
+                            "Tahsilat"
+                        ],
+                        key="yonetim_islem_filtresi"
+                    )
+
+                df_yonetim = df_tum_kayitlar.copy()
+
+                if yonetim_firma != "Tümü":
+
+                    df_yonetim = df_yonetim[
+                        df_yonetim["firma_adi"]
+                        == yonetim_firma
+                    ]
+
+                if yonetim_islem != "Tümü":
+
+                    df_yonetim = df_yonetim[
+                        df_yonetim["islem_turu"]
+                        == yonetim_islem
+                    ]
+
+                st.write(
+                    f"**Gösterilen kayıt:** "
+                    f"{len(df_yonetim)} adet"
+                )
+
+                # -------------------------------------------------
+                # KAYITLAR
+                # -------------------------------------------------
+                if not df_yonetim.empty:
+
+                    st.dataframe(
+                        df_yonetim[
+                            [
+                                "id",
+                                "firma_adi",
+                                "tarih",
+                                "islem_turu",
+                                "adet",
+                                "birim_fiyat",
+                                "toplam_tutar",
+                                "aciklama"
+                            ]
+                        ],
+                        use_container_width=True,
+                        hide_index=True
+                    )
+
+                    st.divider()
+
+                    # -------------------------------------------------
+                    # DÜZENLE / SİL
+                    # -------------------------------------------------
+                    st.subheader(
+                        "✏️ Kayıt Düzenle / Sil"
+                    )
+
+                    secilecek_idler = (
+                        df_yonetim["id"].tolist()
+                    )
+
+                    secilen_id_yonetim = st.selectbox(
+                        "İşlem Seçin:",
+                        secilecek_idler,
+                        format_func=lambda x:
+                            (
+                                f"ID:{x} | "
+                                f"{df_yonetim[df_yonetim['id'] == x]['firma_adi'].iloc[0]} | "
+                                f"{df_yonetim[df_yonetim['id'] == x]['islem_turu'].iloc[0]} | "
+                                f"{float(df_yonetim[df_yonetim['id'] == x]['toplam_tutar'].iloc[0]):,.2f} TL | "
+                                f"{df_yonetim[df_yonetim['id'] == x]['tarih'].iloc[0]}"
+                            ),
+                        key="yonetim_secilen_id"
+                    )
+
+                    secilen_kayit = df_yonetim[
+                        df_yonetim["id"]
+                        == secilen_id_yonetim
+                    ].iloc[0]
+
+                    with st.form(
+                        "toptan_tum_kayit_duzenle_form"
+                    ):
+
+                        e2_firma = st.selectbox(
+                            "Firma",
+                            firma_listesi,
+                            index=(
+                                firma_listesi.index(
+                                    secilen_kayit[
+                                        "firma_adi"
+                                    ]
+                                )
+                                if secilen_kayit[
+                                    "firma_adi"
+                                ] in firma_listesi
+                                else 0
+                            ),
+                            key="yonetim_duzenle_firma"
+                        )
+
+                        e2_tarih = st.date_input(
+                            "Tarih",
+                            datetime.strptime(
+                                str(
+                                    secilen_kayit[
+                                        "tarih"
+                                    ]
+                                ),
+                                "%Y-%m-%d"
+                            ),
+                            key="yonetim_duzenle_tarih"
+                        )
+
+                        e2_tur = st.selectbox(
+                            "İşlem Türü",
+                            [
+                                "Satış",
+                                "Tahsilat"
+                            ],
+                            index=(
+                                0
+                                if secilen_kayit[
+                                    "islem_turu"
+                                ] == "Satış"
+                                else 1
+                            ),
+                            key="yonetim_duzenle_tur"
+                        )
+
+                        if e2_tur == "Satış":
+
+                            e2_adet = st.number_input(
+                                "Adet",
+                                min_value=0,
+                                step=50,
+                                value=int(
+                                    secilen_kayit[
+                                        "adet"
+                                    ]
+                                ),
+                                key="yonetim_duzenle_adet"
+                            )
+
+                            e2_birim = st.number_input(
+                                "Birim Fiyat (TL)",
+                                min_value=0.0,
+                                step=0.5,
+                                value=float(
+                                    secilen_kayit[
+                                        "birim_fiyat"
+                                    ]
+                                ),
+                                format="%.2f",
+                                key="yonetim_duzenle_birim"
+                            )
+
+                            e2_toplam = (
+                                e2_adet * e2_birim
+                            )
+
+                        else:
+
+                            e2_adet = 0
+                            e2_birim = 0.0
+
+                            e2_toplam = st.number_input(
+                                "Tahsil Edilen Tutar (TL)",
+                                min_value=0.0,
+                                step=50.0,
+                                value=float(
+                                    secilen_kayit[
+                                        "toplam_tutar"
+                                    ]
+                                ),
+                                format="%.2f",
+                                key="yonetim_duzenle_tahsilat"
+                            )
+
+                        st.info(
+                            f"💰 Güncel Tutar: "
+                            f"**{e2_toplam:,.2f} TL**"
+                        )
+
+                        e2_aciklama = st.text_input(
+                            "Açıklama / Not",
+                            value=(
+                                str(
+                                    secilen_kayit[
+                                        "aciklama"
+                                    ]
+                                )
+                                if secilen_kayit[
+                                    "aciklama"
+                                ]
+                                else ""
+                            ),
+                            key="yonetim_duzenle_aciklama"
+                        )
+
+                        col_k1, col_k2 = st.columns(2)
+
+                        with col_k1:
+
+                            guncelle_yonetim = (
+                                st.form_submit_button(
+                                    "✏️ KAYDI GÜNCELLE",
+                                    type="primary",
+                                    use_container_width=True
+                                )
+                            )
+
+                        with col_k2:
+
+                            sil_yonetim = (
+                                st.form_submit_button(
+                                    "🗑️ KAYDI SİL",
+                                    use_container_width=True
+                                )
+                            )
+
+                        if guncelle_yonetim:
+
+                            client.execute(
+                                """
+                                UPDATE toptan_satis
+                                SET
+                                    firma_adi=?,
+                                    tarih=?,
+                                    islem_turu=?,
+                                    adet=?,
+                                    birim_fiyat=?,
+                                    toplam_tutar=?,
+                                    aciklama=?
+                                WHERE id=?
+                                """,
+                                [
+                                    e2_firma,
+                                    e2_tarih.strftime(
+                                        "%Y-%m-%d"
+                                    ),
+                                    e2_tur,
+                                    e2_adet,
+                                    e2_birim,
+                                    e2_toplam,
+                                    e2_aciklama,
+                                    int(
+                                        secilen_id_yonetim
+                                    )
+                                ]
+                            )
+
+                            st.success(
+                                "✅ Kayıt başarıyla güncellendi."
+                            )
+
+                            st.rerun()
+
+                        if sil_yonetim:
+
+                            client.execute(
+                                """
+                                DELETE FROM toptan_satis
+                                WHERE id=?
+                                """,
+                                [
+                                    int(
+                                        secilen_id_yonetim
+                                    )
+                                ]
+                            )
+
+                            st.success(
+                                "🗑️ Kayıt başarıyla silindi."
+                            )
+
+                            st.rerun()
+
+                else:
+
+                    st.warning(
+                        "🔍 Seçilen filtrelere uygun kayıt bulunamadı."
+                    )
 
 # ---------------------------------------------------------
 # 3. ALT SEKME: CARİ EKSTRE & PDF RAPORLAR
