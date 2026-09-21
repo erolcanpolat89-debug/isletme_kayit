@@ -1498,53 +1498,223 @@ with alt_sekme3:
 
         </div>
         """
-
-       # -----------------------------------------------------
-# 17. YAZDIR / PDF BUTONU
+# -----------------------------------------------------
+# 17. TELEFON + PC PDF / YAZDIR
 # -----------------------------------------------------
 import streamlit.components.v1 as components
 
 print_button_html = f"""
+<style>
+
+    .pdf-button {{
+        background-color: #ff4b4b;
+        color: white;
+        padding: 12px 20px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 16px;
+        font-weight: bold;
+        width: 100%;
+    }}
+
+    .pdf-button:hover {{
+        background-color: #e63e3e;
+    }}
+
+</style>
+
 <script>
 
-function printDiv() {{
+function printEkstre() {{
 
-    var printContents = `{html_content}`;
+    // Sadece ekstre için yeni bir pencere aç
+    var printWindow = window.open(
+        "",
+        "_blank",
+        "width=1000,height=800"
+    );
 
-    var originalContents = document.body.innerHTML;
+    if (!printWindow) {{
+        alert(
+            "PDF ekranı açılamadı. " +
+            "Lütfen tarayıcıda açılır pencerelere izin verin."
+        );
+        return;
+    }}
 
-    document.body.innerHTML = printContents;
+    // Yeni penceredeki belge
+    printWindow.document.open();
 
-    window.print();
+    printWindow.document.write(`
+        <!DOCTYPE html>
 
-    document.body.innerHTML = originalContents;
+        <html lang="tr">
 
-    window.location.reload();
+        <head>
+
+            <meta charset="UTF-8">
+
+            <meta
+                name="viewport"
+                content="width=device-width, initial-scale=1.0"
+            >
+
+            <title>
+                Cari Hesap Ekstresi - {firma_html}
+            </title>
+
+            <style>
+
+                @page {{
+                    size: A4;
+                    margin: 10mm;
+                }}
+
+                * {{
+                    box-sizing: border-box;
+                }}
+
+                html,
+                body {{
+                    margin: 0;
+                    padding: 0;
+                    background: white;
+                    color: black;
+                    font-family: Arial, Helvetica, sans-serif;
+                }}
+
+                body {{
+                    width: 100%;
+                    font-size: 11px;
+                }}
+
+                .pdf-container {{
+                    width: 100%;
+                    max-width: 190mm;
+                    margin: 0 auto;
+                }}
+
+                table {{
+                    width: 100%;
+                    border-collapse: collapse;
+                    page-break-inside: auto;
+                }}
+
+                thead {{
+                    display: table-header-group;
+                }}
+
+                tr {{
+                    page-break-inside: avoid;
+                    page-break-after: auto;
+                }}
+
+                th,
+                td {{
+                    border: 1px solid #999;
+                    padding: 5px;
+                    vertical-align: middle;
+                }}
+
+                th {{
+                    background: #f2f2f2;
+                    font-weight: bold;
+                }}
+
+                .baslik {{
+                    text-align: center;
+                    font-size: 18px;
+                    font-weight: bold;
+                    margin-bottom: 5px;
+                }}
+
+                .alt-baslik {{
+                    text-align: center;
+                    color: #555;
+                    font-size: 12px;
+                    margin-bottom: 12px;
+                }}
+
+                .bilgi {{
+                    margin-bottom: 6px;
+                }}
+
+                .ozet {{
+                    margin-top: 15px;
+                    border-top: 2px solid #333;
+                    padding-top: 10px;
+                }}
+
+                .bakiye {{
+                    font-size: 15px;
+                    font-weight: bold;
+                    border-top: 1px solid #999;
+                    padding-top: 8px;
+                    margin-top: 8px;
+                }}
+
+                @media print {{
+
+                    body {{
+                        -webkit-print-color-adjust: exact;
+                        print-color-adjust: exact;
+                    }}
+
+                    .pdf-container {{
+                        width: 100%;
+                        max-width: none;
+                    }}
+
+                }}
+
+            </style>
+
+        </head>
+
+        <body>
+
+            <div class="pdf-container">
+
+                {html_content}
+
+            </div>
+
+        </body>
+
+        </html>
+    `);
+
+    printWindow.document.close();
+
+    // Belgenin tamamen yüklenmesini bekle
+    printWindow.onload = function() {{
+
+        setTimeout(function() {{
+
+            printWindow.focus();
+
+            printWindow.print();
+
+        }}, 500);
+
+    }};
 
 }}
 
 </script>
 
 <button
-    onclick="printDiv()"
-    style="
-        background-color: #ff4b4b;
-        color: white;
-        padding: 12px 20px;
-        border: none;
-        border-radius: 5px;
-        cursor: pointer;
-        font-size: 16px;
-        font-weight: bold;
-    "
+    class="pdf-button"
+    onclick="printEkstre()"
 >
-    🖨️ Yazdır / PDF Olarak Kaydet
+    📥 Ekstreyi PDF Olarak Kaydet
 </button>
 """
 
 components.html(
     print_button_html,
-    height=70
+    height=65
 )
 
     else:
