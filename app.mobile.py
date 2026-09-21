@@ -2058,21 +2058,22 @@ pdf_html += f"""
 """
 
 
-# =====================================================
-# PDF PENCERESİ
-# =====================================================
+        # =====================================================
+        # PDF PENCERESİ
+        # =====================================================
 
-components.html(
-    pdf_html,
-    height=90,
-    scrolling=False
-)
+        components.html(
+            pdf_html,
+            height=90,
+            scrolling=False
+        )
 
     else:
 
         # -----------------------------------------------------
         # HAREKET YOKSA
         # -----------------------------------------------------
+
         if devir_bakiye != 0 or devir_adet != 0:
 
             st.info(
@@ -2086,10 +2087,6 @@ components.html(
                 f"🔍 {secilen_firma} firmasına ait "
                 f"bu tarih aralığında hareket bulunamadı."
             )
-
-        # ---------------------------------------------------------
-        # 4. ALT SEKME: TÜM KAYITLAR & GENEL YÖNETİM
-        # ---------------------------------------------------------
         with alt_sekme4:
             st.subheader("⚙️ Tüm Toptan Kayıtları Arşivi ve Düzenleme")
             df_toptan_all = run_query_df("SELECT id, firma_adi, tarih, islem_turu, adet, birim_fiyat, toplam_tutar, aciklama FROM toptan_satis ORDER BY id DESC")
