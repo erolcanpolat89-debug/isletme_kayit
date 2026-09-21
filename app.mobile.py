@@ -686,11 +686,6 @@ with tab1:
         genel_toplam_ciro = dukkan_toplam_ciro + toptan_toplam_ciro
         st.success(f"🎯 **GENEL TOPLAM CİRO ({str_bas} ➔ {str_bit}): {genel_toplam_ciro:,.2f} TL**")
 
-        st.markdown("---")
-        
-        # --- GENEL TOPLAM ---
-        genel_toplam_ciro = dukkan_toplam_ciro + toptan_toplam_ciro
-        st.success(f"🎯 **GENEL TOPLAM CİRO ({str_bas} ➔ {str_bit}): {genel_toplam_ciro:,.2f} TL**")
     elif islem_modu == "📋 Tüm Kayıtları Yönet":
         st.subheader("📋 Dükkan Kayıtlarını Düzenle / Sil")
         df_dukkan_all = run_query_df("SELECT * FROM dukkan_hareket ORDER BY id DESC LIMIT 50")
