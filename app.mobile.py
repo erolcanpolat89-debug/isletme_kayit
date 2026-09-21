@@ -1686,167 +1686,86 @@ td {{
                 from reportlab.pdfbase import pdfmetrics
                 from reportlab.pdfbase.ttfonts import TTFont
 
-                                # ---------------------------------------------
-                # TÜRKÇE FONT BUL
+                               # ---------------------------------------------
+                # TÜRKÇE FONT
                 # ---------------------------------------------
 
-                font_regular = None
-                font_bold = None
+                # Font dosyaları app.mobile.py ile aynı klasörde.
+                # Böylece Streamlit Cloud sistem fontu aramaz.
 
-                # Türkçe karakterleri destekleyen fontları
-                # mümkün olan farklı sistem yollarından arıyoruz.
-                font_konumlari = [
+                font_regular = "DejaVuSans"
+                font_bold = "DejaVuSans-Bold"
 
-                    # -----------------------------------------
-                    # NOTO SANS
-                    # -----------------------------------------
-
-                    (
-                        "NotoSans",
-                        "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
-                        "/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf"
+                font_normal_yolu = os.path.join(
+                    os.path.dirname(
+                        os.path.abspath(__file__)
                     ),
+                    "DejaVuSans.ttf"
+                )
 
-                    (
-                        "NotoSans",
-                        "/usr/share/fonts/opentype/noto/NotoSans-Regular.ttf",
-                        "/usr/share/fonts/opentype/noto/NotoSans-Bold.ttf"
+                font_bold_yolu = os.path.join(
+                    os.path.dirname(
+                        os.path.abspath(__file__)
                     ),
-
-                    (
-                        "NotoSans",
-                        "/usr/share/fonts/truetype/noto/NotoSans-Regular.otf",
-                        "/usr/share/fonts/truetype/noto/NotoSans-Bold.otf"
-                    ),
-
-                    # -----------------------------------------
-                    # DEJAVU SANS
-                    # -----------------------------------------
-
-                    (
-                        "DejaVuSans",
-                        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-                        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-                    ),
-
-                    (
-                        "DejaVuSans",
-                        "/usr/share/fonts/dejavu/DejaVuSans.ttf",
-                        "/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf"
-                    ),
-
-                    # -----------------------------------------
-                    # LIBERATION SANS
-                    # -----------------------------------------
-
-                    (
-                        "LiberationSans",
-                        "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
-                        "/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf"
-                    ),
-
-                    (
-                        "LiberationSans",
-                        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
-                        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"
-                    ),
-
-                    # -----------------------------------------
-                    # FREE SANS
-                    # -----------------------------------------
-
-                    (
-                        "FreeSans",
-                        "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
-                        "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf"
-                    ),
-
-                    # -----------------------------------------
-                    # WINDOWS ARIAL
-                    # -----------------------------------------
-
-                    (
-                        "Arial",
-                        "C:/Windows/Fonts/arial.ttf",
-                        "C:/Windows/Fonts/arialbd.ttf"
-                    ),
-
-                    (
-                        "Arial",
-                        "C:/Windows/Fonts/Arial.ttf",
-                        "C:/Windows/Fonts/Arialbd.ttf"
-                    )
-                ]
+                    "DejaVuSans-Bold.ttf"
+                )
 
                 # ---------------------------------------------
-                # UYGUN FONTU BUL VE KAYDET
+                # FONT DOSYALARI VAR MI?
                 # ---------------------------------------------
 
-                for font_adi, normal_yol, bold_yol in font_konumlari:
-
-                    if (
-                        os.path.exists(normal_yol)
-                        and os.path.exists(bold_yol)
-                    ):
-
-                        try:
-
-                            # Font daha önce kayıtlıysa
-                            # tekrar kayıt etmiyoruz.
-                            try:
-
-                                pdfmetrics.getFont(
-                                    font_adi
-                                )
-
-                                pdfmetrics.getFont(
-                                    font_adi + "-Bold"
-                                )
-
-                                font_regular = font_adi
-                                font_bold = font_adi + "-Bold"
-
-                                break
-
-                            except Exception:
-
-                                pass
-
-                            # Normal font
-                            pdfmetrics.registerFont(
-                                TTFont(
-                                    font_adi,
-                                    normal_yol
-                                )
-                            )
-
-                            # Kalın font
-                            pdfmetrics.registerFont(
-                                TTFont(
-                                    font_adi + "-Bold",
-                                    bold_yol
-                                )
-                            )
-
-                            font_regular = font_adi
-                            font_bold = font_adi + "-Bold"
-
-                            break
-
-                        except Exception:
-
-                            continue
-
-                # ---------------------------------------------
-                # TÜRKÇE FONT BULUNAMADIYSA
-                # ---------------------------------------------
-
-                if font_regular is None:
+                if not os.path.exists(font_normal_yolu):
 
                     st.error(
-                        "❌ Türkçe karakter destekleyen PDF fontu "
-                        "bulunamadı. Noto Sans, DejaVu Sans veya "
-                        "Liberation Sans gerekli."
+                        "❌ DejaVuSans.ttf bulunamadı."
+                    )
+
+                    st.code(
+                        font_normal_yolu
+                    )
+
+                    st.stop()
+
+                if not os.path.exists(font_bold_yolu):
+
+                    st.error(
+                        "❌ DejaVuSans-Bold.ttf bulunamadı."
+                    )
+
+                    st.code(
+                        font_bold_yolu
+                    )
+
+                    st.stop()
+
+                # ---------------------------------------------
+                # FONTLARI REPORTLAB'A KAYDET
+                # ---------------------------------------------
+
+                try:
+
+                    pdfmetrics.registerFont(
+                        TTFont(
+                            font_regular,
+                            font_normal_yolu
+                        )
+                    )
+
+                    pdfmetrics.registerFont(
+                        TTFont(
+                            font_bold,
+                            font_bold_yolu
+                        )
+                    )
+
+                except Exception as font_hata:
+
+                    st.error(
+                        "❌ Türkçe PDF fontu yüklenemedi."
+                    )
+
+                    st.code(
+                        str(font_hata)
                     )
 
                     st.stop()
