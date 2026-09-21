@@ -337,7 +337,7 @@ with tab1:
                 tarih_secim = st.date_input("Tarih", datetime.now(), key="yeni_hareket_tarih")
                 kategori = st.selectbox("Kategori", kategoriler, index=0, key="yeni_hareket_kategori")
             with col2:
-                urun_adi = st.text_input("Ürün / Detay Açıklaması", placeholder="Örn: Pepsi sarf malzemeleri", key="yeni_hareket_urun")
+                urun_adi = st.text_input("Ürün / Detay Açıklaması", placeholder="Örn: Açıklama Giriniz.", key="yeni_hareket_urun")
                 miktar = st.number_input("Miktar / Adet", min_value=1, value=1, step=1, key="yeni_hareket_miktar")
                 
                 son_fiyat_sorgu = run_query_df("SELECT birim_fiyat FROM dukkan_hareket WHERE kategori=? AND birim_fiyat > 0 ORDER BY id DESC LIMIT 1", [kategori])
