@@ -1,18 +1,11 @@
-# =========================================================
-# BÖLÜM 1 - ANA AYARLAR / VERİTABANI / PDF FONKSİYONU
-# =========================================================
-
 import streamlit as st
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime
 import libsql_client as libsql
 import base64
+from datetime import datetime, timedelta
 
-
-# =========================================================
-# SAYFA AYARLARI
-# =========================================================
-
+# Sayfa Ayarları
 st.set_page_config(
     page_title="Midyeci Abla Canlı Takip",
     page_icon="🦪",
@@ -20,11 +13,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-
-# =========================================================
-# YEREL PNG DOSYASINI BASE64 FORMATINA ÇEVİRME
-# =========================================================
-
+# Yerel PNG Dosyasını Base64 Formatına Çevirme
 def get_base64_image(image_path):
     try:
         with open(image_path, "rb") as img_file:
@@ -32,1463 +21,301 @@ def get_base64_image(image_path):
     except Exception:
         return ""
 
-
 img_base64 = get_base64_image("1000295034.png")
 
-
-# =========================================================
-# CSS / TASARIM
-# =========================================================
-
+# Koyu Tema & Arka Plan Logo
 st.markdown(f"""
 <style>
-
     /* Ana Ekran Arka Planı */
     .stApp {{
-        background:
-            linear-gradient(
-                rgba(15, 23, 42, 0.55),
-                rgba(15, 23, 42, 0.55)
-            ),
-            url('data:image/png;base64,{img_base64}')
-            no-repeat center center fixed !important;
-
+        background: linear-gradient(rgba(15, 23, 42, 0.55), rgba(15, 23, 42, 0.55)), 
+                    url('data:image/png;base64,{img_base64}') no-repeat center center fixed !important;
         background-size: cover !important;
     }}
 
-
-    /* Streamlit Üst Çubuk */
-    header,
-    [data-testid="stHeader"],
-    [data-testid="stToolbar"] {{
+    /* Streamlit Üst Çubuk Transparent Yapma */
+    header, [data-testid="stHeader"], [data-testid="stToolbar"] {{
         background: transparent !important;
     }}
 
-
-    /* =====================================================
-       NEON BAŞLIK
-       ===================================================== */
-
+    /* NEON YANIP SÖNEN ORTALI KUTU TASARIMI */
     @keyframes neonPulse {{
         0% {{
             color: #e5c158;
-            text-shadow:
-                0 0 5px #ffcc00,
-                0 0 10px #ffcc00,
-                0 0 15px #ff9900;
+            text-shadow: 0 0 5px #ffcc00, 0 0 10px #ffcc00, 0 0 15px #ff9900;
         }}
-
         50% {{
             color: #fff1b0;
-            text-shadow:
-                0 0 2px #fff,
-                0 0 5px #ffcc00,
-                0 0 8px #ffcc00;
+            text-shadow: 0 0 2px #fff, 0 0 5px #ffcc00, 0 0 8px #ffcc00;
         }}
-
         100% {{
             color: #e5c158;
-            text-shadow:
-                0 0 5px #ffcc00,
-                0 0 10px #ffcc00,
-                0 0 15px #ff9900;
+            text-shadow: 0 0 5px #ffcc00, 0 0 10px #ffcc00, 0 0 15px #ff9900;
         }}
     }}
-
 
     .neon-kutu {{
         display: flex;
         align-items: center;
         justify-content: center;
-
         background: rgba(30, 30, 35, 0.45);
-
         backdrop-filter: blur(8px);
         -webkit-backdrop-filter: blur(8px);
-
         border: 1px solid rgba(255, 255, 255, 0.25);
-
         border-radius: 12px;
-
         padding: 12px 15px;
-
         margin-top: 10px;
         margin-bottom: 20px;
-
-        box-shadow:
-            0 4px 15px rgba(0, 0, 0, 0.4);
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
     }}
-
 
     .neon-yazi {{
         font-size: 26px;
         font-weight: 800;
         font-style: italic;
         letter-spacing: 1px;
-
-        animation:
-            neonPulse 2s infinite ease-in-out;
-
+        animation: neonPulse 2s infinite ease-in-out;
         text-align: center;
     }}
 
-
-    /* =====================================================
-       SEKME ALANI
-       ===================================================== */
-
+    /* SEKMELERİ ÇEVRELEYEN ARKA GÖLGELİ KUTU */
     .stTabs [data-baseweb="tab-list"] {{
         gap: 6px;
-
         background: rgba(255, 255, 255, 0.10) !important;
-
         border: 1px solid rgba(255, 255, 255, 0.25) !important;
-
         border-radius: 12px !important;
-
         padding: 8px !important;
-
         backdrop-filter: blur(8px);
         -webkit-backdrop-filter: blur(8px);
-
-        box-shadow:
-            0 4px 15px rgba(0, 0, 0, 0.4) !important;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4) !important;
     }}
 
-
-    /* Sekmeler */
+    /* SEKMELERİN KENDİSİ VE DARK GOLD YAZILAR */
     .stTabs [data-baseweb="tab"] {{
         background-color: rgba(0, 0, 0, 0.25) !important;
-
         border-radius: 8px !important;
-
         padding: 8px 16px !important;
-
         font-weight: 800 !important;
-
         font-size: 15px !important;
-
-        color: #c5a059 !important;
-
-        text-shadow:
-            0px 1px 3px rgba(0, 0, 0, 0.9);
-
-        border:
-            1px solid rgba(197, 160, 89, 0.3) !important;
-
+        color: #c5a059 !important; /* Dark Gold */
+        text-shadow: 0px 1px 3px rgba(0, 0, 0, 0.9);
+        border: 1px solid rgba(197, 160, 89, 0.3) !important;
         position: relative;
-
-        transition:
-            all 0.3s ease;
+        transition: all 0.3s ease;
     }}
-
 
     .stTabs [data-baseweb="tab"] * {{
         color: #c5a059 !important;
         font-weight: 800 !important;
     }}
 
-
-    /* Hover */
+    /* SEKME ÜZERİNE GELİNCE (HOVER) - IŞIK YANSIMASI VE ALT PARLAMA ÇİZGİSİ */
     .stTabs [data-baseweb="tab"]:hover {{
-        background-color:
-            rgba(197, 160, 89, 0.25) !important;
-
-        border-color:
-            #c5a059 !important;
-
-        box-shadow:
-            0 6px 20px rgba(197, 160, 89, 0.4),
-            inset 0 0 10px rgba(255, 255, 255, 0.2) !important;
-
-        transform:
-            translateY(-2px);
+        background-color: rgba(197, 160, 89, 0.25) !important;
+        border-color: #c5a059 !important;
+        box-shadow: 0 6px 20px rgba(197, 160, 89, 0.4), inset 0 0 10px rgba(255, 255, 255, 0.2) !important;
+        transform: translateY(-2px);
     }}
-
 
     .stTabs [data-baseweb="tab"]:hover::after {{
         content: '';
-
         position: absolute;
-
         bottom: -4px;
         left: 10%;
-
         width: 80%;
         height: 3px;
-
-        background:
-            linear-gradient(
-                90deg,
-                transparent,
-                #f3e5ab,
-                transparent
-            );
-
-        box-shadow:
-            0 0 8px #d4af37;
-
+        background: linear-gradient(90deg, transparent, #f3e5ab, transparent);
+        box-shadow: 0 0 8px #d4af37;
         border-radius: 2px;
     }}
 
-
-    /* Aktif Sekme */
+    /* Seçili Sekme (Active Tab) */
     .stTabs [aria-selected="true"] {{
-        background:
-            linear-gradient(
-                135deg,
-                #c5a059,
-                #8a6d29
-            ) !important;
-
-        border-color:
-            #f3e5ab !important;
-
-        box-shadow:
-            0 4px 12px rgba(0, 0, 0, 0.5) !important;
-
-        transform:
-            translateY(0px);
+        background: linear-gradient(135deg, #c5a059, #8a6d29) !important;
+        border-color: #f3e5ab !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5) !important;
+        transform: translateY(0px);
     }}
-
 
     .stTabs [aria-selected="true"] * {{
         color: #ffffff !important;
     }}
 
-
     .stTabs [aria-selected="true"]::after {{
         content: '';
-
         position: absolute;
-
         bottom: -4px;
         left: 5%;
-
         width: 90%;
         height: 3px;
-
         background: #ffffff;
-
-        box-shadow:
-            0 0 10px #ffffff,
-            0 0 15px #d4af37;
-
+        box-shadow: 0 0 10px #ffffff, 0 0 15px #d4af37;
         border-radius: 2px;
     }}
 
-
-    /* =====================================================
-       YAZILAR
-       ===================================================== */
-
-    .stApp,
-    .stApp p,
-    .stApp label,
-    .stApp span,
-    div[data-testid="stMarkdownContainer"] p,
+    /* TÜM ETIKETLER VE BAŞLIKLAR */
+    .stApp, .stApp p, .stApp label, .stApp span, 
+    div[data-testid="stMarkdownContainer"] p, 
     label[data-testid="stWidgetLabel"] p {{
         color: #ffffff !important;
-
         font-weight: 700 !important;
-
         opacity: 1 !important;
-
-        text-shadow:
-            0px 1px 4px rgba(0, 0, 0, 0.9);
+        text-shadow: 0px 1px 4px rgba(0, 0, 0, 0.9);
     }}
 
-
-    div[role="radiogroup"]
-    label
-    div[data-testid="stMarkdownContainer"] p {{
+    div[role="radiogroup"] label div[data-testid="stMarkdownContainer"] p {{
         color: #ffffff !important;
     }}
 
-
-    /* =====================================================
-       INPUT KUTULARI
-       ===================================================== */
-
-    div[data-baseweb="input"] input,
+    /* TARİH VE INPUT KUTULARI */
+    div[data-baseweb="input"] input, 
     div[data-baseweb="base-input"] input,
     div[data-testid="stTextInput"] input,
     div[data-testid="stDateInput"] input,
-    input[type="text"],
+    input[type="text"], 
     input[type="number"] {{
-
         color: #000000 !important;
-
-        -webkit-text-fill-color:
-            #000000 !important;
-
+        -webkit-text-fill-color: #000000 !important;
         font-weight: 800 !important;
-
-        background-color:
-            #ffffff !important;
-
+        background-color: #ffffff !important;
         opacity: 1 !important;
     }}
 
-
-    div[data-baseweb="input"],
+    div[data-baseweb="input"], 
     div[data-baseweb="base-input"],
     div[data-baseweb="select"] {{
-        background-color:
-            #ffffff !important;
-
-        border-radius:
-            10px !important;
+        background-color: #ffffff !important;
+        border-radius: 10px !important;
     }}
-
 
     div[data-baseweb="select"] div {{
         color: #000000 !important;
         font-weight: 800 !important;
     }}
 
-
-    /* =====================================================
-       FORM / EXPANDER
-       ===================================================== */
-
-    div[data-testid="stForm"],
-    div[data-testid="stExpander"] {{
-
-        background:
-            rgba(15, 23, 42, 0.45) !important;
-
-        backdrop-filter:
-            blur(8px);
-
-        -webkit-backdrop-filter:
-            blur(8px);
-
-        border:
-            1px solid rgba(255, 255, 255, 0.2) !important;
-
-        border-radius:
-            16px !important;
-
-        box-shadow:
-            0 8px 32px 0 rgba(0, 0, 0, 0.4);
-
-        padding:
-            18px !important;
+    /* Glassmorphic Form Kutu Alanları */
+    div[data-testid="stForm"], div[data-testid="stExpander"] {{
+        background: rgba(15, 23, 42, 0.45) !important;
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        border: 1px solid rgba(255, 255, 255, 0.2) !important;
+        border-radius: 16px !important;
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+        padding: 18px !important;
     }}
 
-
-    /* =====================================================
-       BUTONLAR
-       ===================================================== */
-
-    div.stButton > button,
-    div.stFormSubmitButton > button {{
-
+    /* Kaydet Butonları */
+    div.stButton > button, div.stFormSubmitButton > button {{
         width: 100% !important;
-
         height: 50px !important;
-
         font-size: 16px !important;
-
         font-weight: 700 !important;
-
         border-radius: 12px !important;
-
-        background:
-            linear-gradient(
-                135deg,
-                #ff4b4b,
-                #ef4444
-            ) !important;
-
+        background: linear-gradient(135deg, #ff4b4b, #ef4444) !important;
         color: white !important;
-
         border: none !important;
-
-        box-shadow:
-            0 4px 14px rgba(239, 68, 68, 0.4);
+        box-shadow: 0 4px 14px rgba(239, 68, 68, 0.4);
     }}
 
-
-    /* =====================================================
-       PDF ÖN İZLEME KAĞIDI
-       ===================================================== */
-
+    /* Ön İzleme Yazdırma Kağıdı Tasarımı */
     .preview-box {{
         background: #ffffff !important;
-
         color: #000000 !important;
-
         padding: 25px;
-
         border-radius: 12px;
-
-        box-shadow:
-            0 4px 20px rgba(0,0,0,0.5);
+        box-shadow: 0 4px 20px rgba(0,0,0,0.5);
     }}
-
-
     .preview-box * {{
         color: #000000 !important;
-
         text-shadow: none !important;
     }}
 
-
-    /* =====================================================
-       METRİK KARTLARI
-       ===================================================== */
-
+    /* Metrik Kartları */
     div[data-testid="stMetric"] {{
-
-        background:
-            rgba(15, 23, 42, 0.45);
-
-        backdrop-filter:
-            blur(6px);
-
-        border:
-            1px solid rgba(255, 255, 255, 0.15);
-
-        border-radius:
-            14px;
-
-        padding:
-            12px 16px;
+        background: rgba(15, 23, 42, 0.45);
+        backdrop-filter: blur(6px);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 14px;
+        padding: 12px 16px;
     }}
-
 
     div[data-testid="stMetricValue"] {{
         font-size: 24px !important;
-
         font-weight: 800 !important;
-
-        color:
-            #ff6b6b !important;
+        color: #ff6b6b !important;
     }}
-
 
     div[data-testid="stMetricLabel"] {{
-        color:
-            #cbd5e1 !important;
+        color: #cbd5e1 !important;
     }}
-
 </style>
 """, unsafe_allow_html=True)
 
-
-# =========================================================
-# TURSO BULUT VERİTABANI BAĞLANTISI
-# =========================================================
-
+# Turso Bulut Veritabanı Bağlantı Fonksiyonu
 def get_client():
-
     url = st.secrets["TURSO_DATABASE_URL"]
-
     if url.startswith("libsql://"):
-        url = url.replace(
-            "libsql://",
-            "https://"
-        )
-
+        url = url.replace("libsql://", "https://")
     elif url.startswith("wss://"):
-        url = url.replace(
-            "wss://",
-            "https://"
-        )
-
+        url = url.replace("wss://", "https://")
+        
     token = st.secrets["TURSO_AUTH_TOKEN"]
-
-    return libsql.create_client_sync(
-        url=url,
-        auth_token=token
-    )
-
+    return libsql.create_client_sync(url=url, auth_token=token)
 
 client = get_client()
 
-
-# =========================================================
-# YARDIMCI FONKSİYON
-# =========================================================
-
+# Yardımcı Fonksiyon: Libsql Sonucunu Pandas Dataframe'e Çevirir
 def run_query_df(query, params=None):
-
-    res = client.execute(
-        query,
-        params or []
-    )
-
+    res = client.execute(query, params or [])
     columns = res.columns
-
     rows = res.rows
+    return pd.DataFrame(rows, columns=columns)
 
-    return pd.DataFrame(
-        rows,
-        columns=columns
-    )
-
-
-# =========================================================
-# PDF OLUŞTURMA FONKSİYONU
-# =========================================================
-# BURASI YENİ EKLENDİ.
-#
-# PDF ARTIK:
-# - window.print() KULLANMAZ
-# - components.html KULLANMAZ
-# - TELEFONDA YAZDIRMA PENCERESİ AÇMAZ
-# - DOĞRUDAN PDF BYTE ÜRETİR
-# - TÜRKÇE KARAKTERLERİ DESTEKLER
-# =========================================================
-
-def pdf_olustur_turkce(
-    firma_adi,
-    bas_tarih,
-    bit_tarih,
-    df,
-    toplam_satis,
-    toplam_tahsilat,
-    bakiye,
-    devir_bakiye=0.0,
-    devir_adet=0,
-    ekstre_tipi="🔍 Detaylı"
-):
-
-    try:
-
-        from io import BytesIO
-        import os
-
-        from reportlab.lib import colors
-
-        from reportlab.lib.pagesizes import A4
-
-        from reportlab.lib.styles import getSampleStyleSheet
-        from reportlab.lib.enums import TA_CENTER
-
-        from reportlab.lib.units import mm
-
-        from reportlab.platypus import (
-            SimpleDocTemplate,
-            Paragraph,
-            Spacer,
-            Table,
-            TableStyle
-        )
-
-        from reportlab.pdfbase import pdfmetrics
-        from reportlab.pdfbase.ttfonts import TTFont
-
-        from xml.sax.saxutils import escape
-
-
-        # -------------------------------------------------
-        # TÜRKÇE FONT BUL
-        # -------------------------------------------------
-
-        font_normal = None
-        font_bold = None
-
-        font_adaylari = [
-
-            (
-                "DejaVuSans.ttf",
-                "DejaVuSans-Bold.ttf"
-            ),
-
-            (
-                "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-                "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-            ),
-
-            (
-                "/usr/share/fonts/dejavu/DejaVuSans.ttf",
-                "/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf"
-            )
-        ]
-
-
-        for normal_path, bold_path in font_adaylari:
-
-            if (
-                os.path.exists(normal_path)
-                and
-                os.path.exists(bold_path)
-            ):
-
-                try:
-
-                    pdfmetrics.registerFont(
-                        TTFont(
-                            "DejaVuCustom",
-                            normal_path
-                        )
-                    )
-
-                    pdfmetrics.registerFont(
-                        TTFont(
-                            "DejaVuCustomBold",
-                            bold_path
-                        )
-                    )
-
-                    font_normal = "DejaVuCustom"
-                    font_bold = "DejaVuCustomBold"
-
-                    break
-
-                except Exception:
-                    continue
-
-
-        # -------------------------------------------------
-        # FONT BULUNAMAZSA
-        # -------------------------------------------------
-
-        if font_normal is None:
-
-            font_normal = "Helvetica"
-            font_bold = "Helvetica-Bold"
-
-
-        # -------------------------------------------------
-        # PDF BELGESİ
-        # -------------------------------------------------
-
-        buffer = BytesIO()
-
-        doc = SimpleDocTemplate(
-
-            buffer,
-
-            pagesize=A4,
-
-            rightMargin=10 * mm,
-            leftMargin=10 * mm,
-
-            topMargin=10 * mm,
-            bottomMargin=10 * mm
-        )
-
-
-        styles = getSampleStyleSheet()
-
-
-        baslik_style = styles["Title"]
-
-        baslik_style.fontName = font_bold
-
-        baslik_style.fontSize = 18
-
-        baslik_style.leading = 22
-
-        baslik_style.alignment = TA_CENTER
-
-        baslik_style.textColor = colors.HexColor(
-            "#222222"
-        )
-
-
-        normal_style = styles["Normal"]
-
-        normal_style.fontName = font_normal
-
-        normal_style.fontSize = 8.5
-
-        normal_style.leading = 11
-
-
-        small_style = styles["Normal"]
-
-        small_style.fontName = font_normal
-
-        small_style.fontSize = 7
-
-        small_style.leading = 9
-
-
-        # -------------------------------------------------
-        # PDF İÇERİĞİ
-        # -------------------------------------------------
-
-        story = []
-
-
-        story.append(
-            Paragraph(
-                "MİDYECİ ABLA - CARİ HESAP EKSTRESİ",
-                baslik_style
-            )
-        )
-
-
-        story.append(
-            Spacer(1, 5 * mm)
-        )
-
-
-        # -------------------------------------------------
-        # FİRMA BİLGİLERİ
-        # -------------------------------------------------
-
-        bilgi_data = [
-
-            [
-                Paragraph(
-                    "<b>Firma Adı</b>",
-                    normal_style
-                ),
-
-                Paragraph(
-                    escape(str(firma_adi)),
-                    normal_style
-                )
-            ],
-
-            [
-                Paragraph(
-                    "<b>Tarih Aralığı</b>",
-                    normal_style
-                ),
-
-                Paragraph(
-                    f"{escape(str(bas_tarih))} / "
-                    f"{escape(str(bit_tarih))}",
-                    normal_style
-                )
-            ],
-
-            [
-                Paragraph(
-                    "<b>Ekstre Türü</b>",
-                    normal_style
-                ),
-
-                Paragraph(
-                    escape(str(ekstre_tipi)),
-                    normal_style
-                )
-            ]
-        ]
-
-
-        bilgi_table = Table(
-
-            bilgi_data,
-
-            colWidths=[
-                35 * mm,
-                145 * mm
-            ]
-        )
-
-
-        bilgi_table.setStyle(
-
-            TableStyle([
-
-                (
-                    "BACKGROUND",
-                    (0, 0),
-                    (0, -1),
-                    colors.HexColor("#eeeeee")
-                ),
-
-                (
-                    "BOX",
-                    (0, 0),
-                    (-1, -1),
-                    0.5,
-                    colors.HexColor("#cccccc")
-                ),
-
-                (
-                    "INNERGRID",
-                    (0, 0),
-                    (-1, -1),
-                    0.3,
-                    colors.HexColor("#dddddd")
-                ),
-
-                (
-                    "VALIGN",
-                    (0, 0),
-                    (-1, -1),
-                    "MIDDLE"
-                ),
-
-                (
-                    "LEFTPADDING",
-                    (0, 0),
-                    (-1, -1),
-                    5
-                ),
-
-                (
-                    "RIGHTPADDING",
-                    (0, 0),
-                    (-1, -1),
-                    5
-                ),
-
-                (
-                    "TOPPADDING",
-                    (0, 0),
-                    (-1, -1),
-                    4
-                ),
-
-                (
-                    "BOTTOMPADDING",
-                    (0, 0),
-                    (-1, -1),
-                    4
-                )
-            ])
-        )
-
-
-        story.append(
-            bilgi_table
-        )
-
-
-        story.append(
-            Spacer(1, 5 * mm)
-        )
-
-
-        # -------------------------------------------------
-        # ÖZET KUTUSU
-        # -------------------------------------------------
-
-        final_bakiye = (
-            float(devir_bakiye)
-            +
-            float(toplam_satis)
-            -
-            float(toplam_tahsilat)
-        )
-
-
-        ozet_data = [
-
-            [
-                Paragraph(
-                    "<b>Devir Bakiye</b>",
-                    normal_style
-                ),
-
-                Paragraph(
-                    f"{float(devir_bakiye):,.2f} TL",
-                    normal_style
-                )
-            ],
-
-            [
-                Paragraph(
-                    "<b>Dönem Satış</b>",
-                    normal_style
-                ),
-
-                Paragraph(
-                    f"{float(toplam_satis):,.2f} TL",
-                    normal_style
-                )
-            ],
-
-            [
-                Paragraph(
-                    "<b>Dönem Tahsilat</b>",
-                    normal_style
-                ),
-
-                Paragraph(
-                    f"{float(toplam_tahsilat):,.2f} TL",
-                    normal_style
-                )
-            ],
-
-            [
-                Paragraph(
-                    "<b>Kalan Bakiye</b>",
-                    normal_style
-                ),
-
-                Paragraph(
-                    f"<b>{final_bakiye:,.2f} TL</b>",
-                    normal_style
-                )
-            ]
-        ]
-
-
-        ozet_table = Table(
-
-            ozet_data,
-
-            colWidths=[
-                45 * mm,
-                45 * mm
-            ]
-        )
-
-
-        ozet_table.setStyle(
-
-            TableStyle([
-
-                (
-                    "BACKGROUND",
-                    (0, 0),
-                    (-1, -1),
-                    colors.HexColor("#f7f7f7")
-                ),
-
-                (
-                    "BOX",
-                    (0, 0),
-                    (-1, -1),
-                    0.5,
-                    colors.HexColor("#bbbbbb")
-                ),
-
-                (
-                    "INNERGRID",
-                    (0, 0),
-                    (-1, -1),
-                    0.3,
-                    colors.HexColor("#dddddd")
-                ),
-
-                (
-                    "ALIGN",
-                    (1, 0),
-                    (1, -1),
-                    "RIGHT"
-                ),
-
-                (
-                    "LEFTPADDING",
-                    (0, 0),
-                    (-1, -1),
-                    5
-                ),
-
-                (
-                    "RIGHTPADDING",
-                    (0, 0),
-                    (-1, -1),
-                    5
-                ),
-
-                (
-                    "TOPPADDING",
-                    (0, 0),
-                    (-1, -1),
-                    4
-                ),
-
-                (
-                    "BOTTOMPADDING",
-                    (0, 0),
-                    (-1, -1),
-                    4
-                )
-            ])
-        )
-
-
-        story.append(
-            ozet_table
-        )
-
-
-        story.append(
-            Spacer(1, 6 * mm)
-        )
-
-
-        # -------------------------------------------------
-        # HAREKET TABLOSU
-        # -------------------------------------------------
-
-        if ekstre_tipi == "🔍 Detaylı":
-
-            headers = [
-
-                "Tarih",
-                "İşlem",
-                "Adet",
-                "Küm. Adet",
-                "Birim Fiyat",
-                "Tutar",
-                "Kalan Bakiye",
-                "Açıklama"
-            ]
-
-        else:
-
-            headers = [
-
-                "Tarih",
-                "İşlem",
-                "Adet",
-                "Küm. Adet",
-                "Tutar",
-                "Kalan Bakiye",
-                "Açıklama"
-            ]
-
-
-        table_data = [
-
-            [
-                Paragraph(
-                    f"<b>{escape(str(x))}</b>",
-                    small_style
-                )
-
-                for x in headers
-            ]
-        ]
-
-
-        # -------------------------------------------------
-        # VERİLER
-        # -------------------------------------------------
-
-        if not df.empty:
-
-            for _, row in df.iterrows():
-
-                tarih = str(
-                    row.get("tarih", "")
-                )
-
-                islem = str(
-                    row.get(
-                        "islem_turu",
-                        ""
-                    )
-                )
-
-                adet = row.get(
-                    "adet",
-                    0
-                )
-
-                kume_adet = row.get(
-                    "Kümülatif_Adet",
-                    0
-                )
-
-                birim_fiyat = row.get(
-                    "birim_fiyat",
-                    0
-                )
-
-                tutar = row.get(
-                    "toplam_tutar",
-                    0
-                )
-
-                kalan = row.get(
-                    "Kalan_Bakiye",
-                    0
-                )
-
-                aciklama = row.get(
-                    "aciklama",
-                    "-"
-                )
-
-
-                if pd.isna(aciklama):
-                    aciklama = "-"
-
-
-                try:
-                    adet = int(adet)
-                except Exception:
-                    adet = 0
-
-
-                try:
-                    kume_adet = int(kume_adet)
-                except Exception:
-                    kume_adet = 0
-
-
-                try:
-                    birim_fiyat = float(
-                        birim_fiyat
-                    )
-                except Exception:
-                    birim_fiyat = 0.0
-
-
-                try:
-                    tutar = float(tutar)
-                except Exception:
-                    tutar = 0.0
-
-
-                try:
-                    kalan = float(kalan)
-                except Exception:
-                    kalan = 0.0
-
-
-                if ekstre_tipi == "🔍 Detaylı":
-
-                    row_data = [
-
-                        Paragraph(
-                            escape(tarih),
-                            small_style
-                        ),
-
-                        Paragraph(
-                            escape(islem),
-                            small_style
-                        ),
-
-                        Paragraph(
-                            f"{adet:,}",
-                            small_style
-                        ),
-
-                        Paragraph(
-                            f"{kume_adet:,}",
-                            small_style
-                        ),
-
-                        Paragraph(
-                            f"{birim_fiyat:,.2f}",
-                            small_style
-                        ),
-
-                        Paragraph(
-                            f"{tutar:,.2f}",
-                            small_style
-                        ),
-
-                        Paragraph(
-                            f"{kalan:,.2f}",
-                            small_style
-                        ),
-
-                        Paragraph(
-                            escape(str(aciklama)),
-                            small_style
-                        )
-                    ]
-
-                else:
-
-                    row_data = [
-
-                        Paragraph(
-                            escape(tarih),
-                            small_style
-                        ),
-
-                        Paragraph(
-                            escape(islem),
-                            small_style
-                        ),
-
-                        Paragraph(
-                            f"{adet:,}",
-                            small_style
-                        ),
-
-                        Paragraph(
-                            f"{kume_adet:,}",
-                            small_style
-                        ),
-
-                        Paragraph(
-                            f"{tutar:,.2f}",
-                            small_style
-                        ),
-
-                        Paragraph(
-                            f"{kalan:,.2f}",
-                            small_style
-                        ),
-
-                        Paragraph(
-                            escape(str(aciklama)),
-                            small_style
-                        )
-                    ]
-
-
-                table_data.append(
-                    row_data
-                )
-
-
-        # -------------------------------------------------
-        # TABLO GENİŞLİĞİ
-        # -------------------------------------------------
-
-        if ekstre_tipi == "🔍 Detaylı":
-
-            col_widths = [
-
-                23 * mm,
-                20 * mm,
-                15 * mm,
-                18 * mm,
-                22 * mm,
-                22 * mm,
-                25 * mm,
-                35 * mm
-            ]
-
-        else:
-
-            col_widths = [
-
-                25 * mm,
-                23 * mm,
-                18 * mm,
-                22 * mm,
-                25 * mm,
-                27 * mm,
-                45 * mm
-            ]
-
-
-        hareket_table = Table(
-
-            table_data,
-
-            colWidths=col_widths,
-
-            repeatRows=1
-        )
-
-
-        hareket_table.setStyle(
-
-            TableStyle([
-
-                (
-                    "BACKGROUND",
-                    (0, 0),
-                    (-1, 0),
-                    colors.HexColor("#222222")
-                ),
-
-                (
-                    "TEXTCOLOR",
-                    (0, 0),
-                    (-1, 0),
-                    colors.white
-                ),
-
-                (
-                    "FONTNAME",
-                    (0, 0),
-                    (-1, 0),
-                    font_bold
-                ),
-
-                (
-                    "GRID",
-                    (0, 0),
-                    (-1, -1),
-                    0.35,
-                    colors.HexColor("#cccccc")
-                ),
-
-                (
-                    "VALIGN",
-                    (0, 0),
-                    (-1, -1),
-                    "MIDDLE"
-                ),
-
-                (
-                    "ALIGN",
-                    (2, 1),
-                    (-2, -1),
-                    "RIGHT"
-                ),
-
-                (
-                    "LEFTPADDING",
-                    (0, 0),
-                    (-1, -1),
-                    3
-                ),
-
-                (
-                    "RIGHTPADDING",
-                    (0, 0),
-                    (-1, -1),
-                    3
-                ),
-
-                (
-                    "TOPPADDING",
-                    (0, 0),
-                    (-1, -1),
-                    3
-                ),
-
-                (
-                    "BOTTOMPADDING",
-                    (0, 0),
-                    (-1, -1),
-                    3
-                )
-            ])
-        )
-
-
-        story.append(
-            hareket_table
-        )
-
-
-        story.append(
-            Spacer(1, 5 * mm)
-        )
-
-
-        story.append(
-
-            Paragraph(
-
-                "Bu belge Midyeci Abla Canlı Takip sistemi "
-                "tarafından oluşturulmuştur.",
-
-                small_style
-            )
-        )
-
-
-        # -------------------------------------------------
-        # PDF OLUŞTUR
-        # -------------------------------------------------
-
-        doc.build(
-            story
-        )
-
-
-        buffer.seek(0)
-
-        return buffer.getvalue()
-
-
-    except Exception as e:
-
-        raise RuntimeError(
-            f"PDF oluşturulurken hata oluştu: {e}"
-        )
-
-
-# =========================================================
-# TABLOLARI OLUŞTURMA
-# =========================================================
-
+# Tabloları Oluşturma
 client.execute('''
     CREATE TABLE IF NOT EXISTS firmalar (
-
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-
         firma_adi TEXT UNIQUE,
-
         telefon TEXT,
-
         aciklama TEXT
     )
 ''')
-
 
 client.execute('''
     CREATE TABLE IF NOT EXISTS toptan_satis (
-
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-
         firma_adi TEXT,
-
         tarih TEXT,
-
         islem_turu TEXT DEFAULT 'Satış',
-
         adet INTEGER DEFAULT 0,
-
         birim_fiyat REAL DEFAULT 0.0,
-
         toplam_tutar REAL,
-
         aciklama TEXT
     )
 ''')
 
-
 client.execute('''
     CREATE TABLE IF NOT EXISTS dukkan_hareket (
-
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-
         tarih TEXT,
-
         islem_tipi TEXT,
-
         kategori TEXT,
-
         urun_adi TEXT,
-
         miktar INTEGER,
-
         birim_fiyat REAL,
-
         tutar REAL
     )
 ''')
 
-
-# =========================================================
-# ANA BAŞLIK
-# =========================================================
-
+# Şık, Ortalanmış ve Neon Yanıp Sönen Başlık Kutusu
 st.markdown("""
 <div class="neon-kutu">
-
-    <div class="neon-yazi">
-        🦪 MİDYECİ ABLA CANLI TAKİP 🦪
-    </div>
-
+    <div class="neon-yazi">🦪 MİDYECİ ABLA CANLI TAKİP 🦪</div>
 </div>
 """, unsafe_allow_html=True)
 
-
-# =========================================================
-# SEKME YAPISI
-# =========================================================
-
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
-    "🏪 Dükkan",
-    "🚚 Toptan",
-    "🏢 Firmalar",
-    "📊 Cari Ekstre",
-    "💰 Borç/Alacak"
-])
-
-
-# =========================================================
-# BUGÜN
-# =========================================================
+# Sekmeler (5 Sekmeli Yapı)
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["🏪 Dükkan", "🚚 Toptan", "🏢 Firmalar", "📊 Cari Ekstre", "💰 Borç/Alacak"])
 
 bugun = datetime.now().strftime("%Y-%m-%d")
 
