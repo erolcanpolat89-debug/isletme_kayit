@@ -1498,183 +1498,478 @@ with alt_sekme3:
 
         </div>
         """
+               # -----------------------------------------------------
+        # 17. GERÇEK PDF OLUŞTURMA
         # -----------------------------------------------------
-        # 17. TELEFON + PC PDF / YAZDIR
+        import io
+        import os
+
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import A4, landscape
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.enums import TA_CENTER, TA_LEFT
+        from reportlab.lib.units import mm
+        from reportlab.platypus import (
+            SimpleDocTemplate,
+            Table,
+            TableStyle,
+            Paragraph,
+            Spacer
+        )
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
+
+        st.markdown("---")
+        st.markdown("### 📥 Ekstreyi PDF Olarak İndir")
+
         # -----------------------------------------------------
-        import streamlit.components.v1 as components
+        # TÜRKÇE KARAKTER DESTEKLİ FONT
+        # -----------------------------------------------------
+        font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+        font_bold_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 
-        print_button_html = f"""
-        <style>
+        if os.path.exists(font_path):
+            pdfmetrics.registerFont(
+                TTFont("DejaVuSans", font_path)
+            )
 
-            .pdf-button {{
-                background-color: #ff4b4b;
-                color: white;
-                padding: 12px 20px;
-                border: none;
-                border-radius: 6px;
-                cursor: pointer;
-                font-size: 16px;
-                font-weight: bold;
-                width: 100%;
-            }}
+            if os.path.exists(font_bold_path):
+                pdfmetrics.registerFont(
+                    TTFont("DejaVuSans-Bold", font_bold_path)
+                )
+                normal_font = "DejaVuSans"
+                bold_font = "DejaVuSans-Bold"
+            else:
+                normal_font = "DejaVuSans"
+                bold_font = "DejaVuSans"
 
-            .pdf-button:hover {{
-                background-color: #e63e3e;
-            }}
+        else:
+            normal_font = "Helvetica"
+            bold_font = "Helvetica-Bold"
 
-        </style>
+        # -----------------------------------------------------
+        # PDF DOSYASINI HAFIZADA OLUŞTUR
+        # -----------------------------------------------------
+        pdf_buffer = io.BytesIO()
 
-        <script>
+        # Çok sütun olduğu için A4 yatay
+        doc = SimpleDocTemplate(
+            pdf_buffer,
+            pagesize=landscape(A4),
+            rightMargin=8 * mm,
+            leftMargin=8 * mm,
+            topMargin=8 * mm,
+            bottomMargin=8 * mm
+        )
 
-        function printEkstre() {{
+        styles = getSampleStyleSheet()
 
-            var printWindow = window.open(
-                "",
-                "_blank",
-                "width=1000,height=800"
-            );
+        baslik_stil = ParagraphStyle(
+            "Baslik",
+            parent=styles["Heading1"],
+            fontName=bold_font,
+            fontSize=16,
+            leading=20,
+            alignment=TA_CENTER,
+            spaceAfter=5
+        )
 
-            if (!printWindow) {{
-                alert(
-                    "PDF ekranı açılamadı. " +
-                    "Lütfen tarayıcıda açılır pencerelere izin verin."
-                );
-                return;
-            }}
+        alt_baslik_stil = ParagraphStyle(
+            "AltBaslik",
+            parent=styles["Normal"],
+            fontName=normal_font,
+            fontSize=9,
+            leading=12,
+            alignment=TA_CENTER
+        )
 
-            printWindow.document.open();
+        normal_stil = ParagraphStyle(
+            "NormalTR",
+            parent=styles["Normal"],
+            fontName=normal_font,
+            fontSize=8,
+            leading=10
+        )
 
-            printWindow.document.write(`
-                <!DOCTYPE html>
+        bold_stil = ParagraphStyle(
+            "BoldTR",
+            parent=styles["Normal"],
+            fontName=bold_font,
+            fontSize=8,
+            leading=10
+        )
 
-                <html lang="tr">
+        kucuk_stil = ParagraphStyle(
+            "KucukTR",
+            parent=styles["Normal"],
+            fontName=normal_font,
+            fontSize=7,
+            leading=9
+        )
 
-                <head>
+        story = []
 
-                    <meta charset="UTF-8">
+        # -----------------------------------------------------
+        # BAŞLIK
+        # -----------------------------------------------------
+        story.append(
+            Paragraph(
+                "MİDYECİ ABLA - CARİ HESAP EKSTRESİ",
+                baslik_stil
+            )
+        )
 
-                    <meta
-                        name="viewport"
-                        content="width=device-width, initial-scale=1.0"
-                    >
+        story.append(
+            Paragraph(
+                f"<b>Firma:</b> {firma_html}",
+                normal_stil
+            )
+        )
 
-                    <title>
-                        Cari Hesap Ekstresi - {firma_html}
-                    </title>
+        story.append(
+            Paragraph(
+                f"<b>Tarih Aralığı:</b> "
+                f"{str_bas_tarih} / {str_bit_tarih}",
+                normal_stil
+            )
+        )
 
-                    <style>
+        story.append(
+            Spacer(1, 5 * mm)
+        )
 
-                        @page {{
-                            size: A4;
-                            margin: 10mm;
-                        }}
+        # -----------------------------------------------------
+        # TABLO BAŞLIĞI
+        # -----------------------------------------------------
+        if ekstre_tipi == "🔍 Detaylı":
 
-                        * {{
-                            box-sizing: border-box;
-                        }}
+            tablo = [[
+                "Tarih",
+                "İşlem",
+                "Adet",
+                "Kümülatif\nAdet",
+                "Birim Fiyat",
+                "Tutar",
+                "Kalan Bakiye",
+                "Açıklama"
+            ]]
 
-                        html,
-                        body {{
-                            margin: 0;
-                            padding: 0;
-                            background: white;
-                            color: black;
-                            font-family: Arial, Helvetica, sans-serif;
-                        }}
+        else:
 
-                        body {{
-                            width: 100%;
-                            font-size: 11px;
-                        }}
+            tablo = [[
+                "Tarih",
+                "İşlem",
+                "Adet",
+                "Kümülatif\nAdet",
+                "Tutar",
+                "Kalan Bakiye",
+                "Açıklama"
+            ]]
 
-                        .pdf-container {{
-                            width: 100%;
-                            max-width: 190mm;
-                            margin: 0 auto;
-                        }}
+        # -----------------------------------------------------
+        # HAREKETLER
+        # -----------------------------------------------------
+        for index, row in df_firma_hareket.iterrows():
 
-                        table {{
-                            width: 100%;
-                            border-collapse: collapse;
-                            page-break-inside: auto;
-                        }}
+            tarih = str(row["tarih"])[:10]
+            islem = str(row["islem_turu"])
 
-                        thead {{
-                            display: table-header-group;
-                        }}
+            adet = int(row["adet"])
+            kume_adet = int(row["Kümülatif_Adet"])
 
-                        tr {{
-                            page-break-inside: avoid;
-                            page-break-after: auto;
-                        }}
+            tutar = float(row["toplam_tutar"])
+            kalan = float(row["Kalan_Bakiye"])
 
-                        th,
-                        td {{
-                            border: 1px solid #999;
-                            padding: 5px;
-                            vertical-align: middle;
-                        }}
+            aciklama = (
+                str(row["aciklama"])
+                if pd.notna(row["aciklama"])
+                else "-"
+            )
 
-                        th {{
-                            background: #f2f2f2;
-                            font-weight: bold;
-                        }}
+            if ekstre_tipi == "🔍 Detaylı":
 
-                        @media print {{
+                birim_fiyat = float(
+                    row["birim_fiyat"]
+                )
 
-                            body {{
-                                -webkit-print-color-adjust: exact;
-                                print-color-adjust: exact;
-                            }}
+                tablo.append([
+                    tarih,
+                    islem,
+                    f"{adet:,}",
+                    f"{kume_adet:,}",
+                    f"{birim_fiyat:,.2f} TL",
+                    f"{tutar:,.2f} TL",
+                    f"{kalan:,.2f} TL",
+                    aciklama
+                ])
 
-                        }}
+            else:
 
-                    </style>
+                tablo.append([
+                    tarih,
+                    islem,
+                    f"{adet:,}",
+                    f"{kume_adet:,}",
+                    f"{tutar:,.2f} TL",
+                    f"{kalan:,.2f} TL",
+                    aciklama
+                ])
 
-                </head>
+        # -----------------------------------------------------
+        # TABLO GENİŞLİKLERİ
+        # -----------------------------------------------------
+        if ekstre_tipi == "🔍 Detaylı":
 
-                <body>
+            col_widths = [
+                25 * mm,   # Tarih
+                24 * mm,   # İşlem
+                17 * mm,   # Adet
+                22 * mm,   # Kümülatif
+                28 * mm,   # Birim fiyat
+                28 * mm,   # Tutar
+                31 * mm,   # Bakiye
+                55 * mm    # Açıklama
+            ]
 
-                    <div class="pdf-container">
+        else:
 
-                        {html_content}
+            col_widths = [
+                28 * mm,
+                28 * mm,
+                20 * mm,
+                25 * mm,
+                32 * mm,
+                35 * mm,
+                65 * mm
+            ]
 
-                    </div>
+        pdf_table = Table(
+            tablo,
+            colWidths=col_widths,
+            repeatRows=1
+        )
 
-                </body>
+        pdf_table.setStyle(
+            TableStyle([
+                (
+                    "FONTNAME",
+                    (0, 0),
+                    (-1, -1),
+                    normal_font
+                ),
+                (
+                    "FONTNAME",
+                    (0, 0),
+                    (-1, 0),
+                    bold_font
+                ),
+                (
+                    "FONTSIZE",
+                    (0, 0),
+                    (-1, -1),
+                    7
+                ),
+                (
+                    "BACKGROUND",
+                    (0, 0),
+                    (-1, 0),
+                    colors.lightgrey
+                ),
+                (
+                    "TEXTCOLOR",
+                    (0, 0),
+                    (-1, 0),
+                    colors.black
+                ),
+                (
+                    "GRID",
+                    (0, 0),
+                    (-1, -1),
+                    0.5,
+                    colors.grey
+                ),
+                (
+                    "VALIGN",
+                    (0, 0),
+                    (-1, -1),
+                    "MIDDLE"
+                ),
+                (
+                    "ALIGN",
+                    (2, 1),
+                    (6, -1),
+                    "RIGHT"
+                ),
+                (
+                    "ALIGN",
+                    (0, 0),
+                    (1, -1),
+                    "LEFT"
+                ),
+                (
+                    "TOPPADDING",
+                    (0, 0),
+                    (-1, -1),
+                    4
+                ),
+                (
+                    "BOTTOMPADDING",
+                    (0, 0),
+                    (-1, -1),
+                    4
+                )
+            ])
+        )
 
-                </html>
-            `);
+        story.append(pdf_table)
 
-            printWindow.document.close();
+        story.append(
+            Spacer(1, 5 * mm)
+        )
 
-            printWindow.onload = function() {{
+        # -----------------------------------------------------
+        # ÖZET
+        # -----------------------------------------------------
+        ozet_data = [
+            [
+                Paragraph(
+                    "<b>Devir Bakiye:</b>",
+                    normal_stil
+                ),
+                Paragraph(
+                    f"{devir_bakiye:,.2f} TL",
+                    normal_stil
+                )
+            ],
+            [
+                Paragraph(
+                    "<b>Dönem Toplam Satış:</b>",
+                    normal_stil
+                ),
+                Paragraph(
+                    f"{toplam_satis:,.2f} TL",
+                    normal_stil
+                )
+            ],
+            [
+                Paragraph(
+                    "<b>Dönem Toplam Tahsilat:</b>",
+                    normal_stil
+                ),
+                Paragraph(
+                    f"{toplam_tahsilat:,.2f} TL",
+                    normal_stil
+                )
+            ],
+            [
+                Paragraph(
+                    "<b>Dönem Satış Adedi:</b>",
+                    normal_stil
+                ),
+                Paragraph(
+                    f"{donem_adet:,} Adet",
+                    normal_stil
+                )
+            ],
+            [
+                Paragraph(
+                    "<b>Kümülatif Toplam Adet:</b>",
+                    normal_stil
+                ),
+                Paragraph(
+                    f"{toplam_adet:,} Adet",
+                    normal_stil
+                )
+            ],
+            [
+                Paragraph(
+                    "<b>KALAN BAKİYE:</b>",
+                    bold_stil
+                ),
+                Paragraph(
+                    f"<b>{bakiye:,.2f} TL</b>",
+                    bold_stil
+                )
+            ]
+        ]
 
-                setTimeout(function() {{
+        ozet_table = Table(
+            ozet_data,
+            colWidths=[
+                55 * mm,
+                45 * mm
+            ]
+        )
 
-                    printWindow.focus();
+        ozet_table.setStyle(
+            TableStyle([
+                (
+                    "FONTNAME",
+                    (0, 0),
+                    (-1, -1),
+                    normal_font
+                ),
+                (
+                    "GRID",
+                    (0, 0),
+                    (-1, -1),
+                    0.5,
+                    colors.grey
+                ),
+                (
+                    "VALIGN",
+                    (0, 0),
+                    (-1, -1),
+                    "MIDDLE"
+                ),
+                (
+                    "ALIGN",
+                    (1, 0),
+                    (1, -1),
+                    "RIGHT"
+                ),
+                (
+                    "TOPPADDING",
+                    (0, 0),
+                    (-1, -1),
+                    4
+                ),
+                (
+                    "BOTTOMPADDING",
+                    (0, 0),
+                    (-1, -1),
+                    4
+                )
+            ])
+        )
 
-                    printWindow.print();
+        story.append(ozet_table)
 
-                }}, 500);
+        # -----------------------------------------------------
+        # PDF'Yİ OLUŞTUR
+        # -----------------------------------------------------
+        doc.build(story)
 
-            }};
+        pdf_buffer.seek(0)
 
-        }}
+        pdf_data = pdf_buffer.getvalue()
 
-        </script>
+        # -----------------------------------------------------
+        # TELEFON + PC İNDİRME BUTONU
+        # -----------------------------------------------------
+        dosya_adi = (
+            f"Cari_Ekstre_"
+            f"{secilen_firma.replace(' ', '_')}_"
+            f"{str_bas_tarih}_{str_bit_tarih}.pdf"
+        )
 
-        <button
-            class="pdf-button"
-            onclick="printEkstre()"
-        >
-            📥 Ekstreyi PDF Olarak Kaydet
-        </button>
-        """
-
-        components.html(
-            print_button_html,
-            height=65
+        st.download_button(
+            label="📥 Ekstreyi PDF Olarak İndir",
+            data=pdf_data,
+            file_name=dosya_adi,
+            mime="application/pdf",
+            use_container_width=True,
+            key="cari_ekstre_pdf_indir"
         )
 
     else:
