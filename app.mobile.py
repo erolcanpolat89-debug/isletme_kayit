@@ -3227,9 +3227,453 @@ td {{
                     f"| Devir Adet: **{devir_adet:,} Adet**"
                 )
 
-            else:
+                        else:
 
                 st.warning(
                     f"🔍 {secilen_firma} firmasına ait "
                     f"bu tarih aralığında hareket bulunamadı."
                 )
+
+
+# ==========================================
+# 5. SEKME: BORÇ / ALACAK
+# ==========================================
+with tab5:
+
+    st.subheader("💰 Borç / Alacak Takibi")
+
+    # ------------------------------------------
+    # FİRMALARIN BORÇ / ALACAK DURUMU
+    # ------------------------------------------
+    df_borc_alacak = run_query_df(
+        """
+        SELECT
+            f.firma_adi,
+
+            COALESCE(
+                (
+                    SELECT SUM(t1.toplam_tutar)
+                    FROM toptan_satis t1
+                    WHERE t1.firma_adi = f.firma_adi
+                      AND t1.islem_turu = 'Satış'
+                ),
+                0
+            ) AS toplam_satis,
+
+            COALESCE(
+                (
+                    SELECT SUM(t2.toplam_tutar)
+                    FROM toptan_satis t2
+                    WHERE t2.firma_adi = f.firma_adi
+                      AND t2.islem_turu = 'Tahsilat'
+                ),
+                0
+            ) AS toplam_tahsilat
+
+        FROM firmalar f
+        ORDER BY f.firma_adi ASC
+        """
+    )
+
+    if df_borc_alacak.empty:
+
+        st.info("📭 Henüz kayıtlı firma bulunmuyor.")
+
+    else:
+
+        df_borc_alacak["toplam_satis"] = pd.to_numeric(
+            df_borc_alacak["toplam_satis"],
+            errors="coerce"
+        ).fillna(0.0)
+
+        df_borc_alacak["toplam_tahsilat"] = pd.to_numeric(
+            df_borc_alacak["toplam_tahsilat"],
+            errors="coerce"
+        ).fillna(0.0)
+
+        df_borc_alacak["bakiye"] = (
+            df_borc_alacak["toplam_satis"]
+            - df_borc_alacak["toplam_tahsilat"]
+        )
+
+        # ------------------------------------------
+        # DURUM BELİRLE
+        # ------------------------------------------
+        def durum_belirle(bakiye):
+
+            if bakiye > 0:
+                return "🔴 BORÇLU"
+
+            elif bakiye < 0:
+                return "🟢 ALACAKLI"
+
+            else:
+                return "⚪ HESAP KAPALI"
+
+        df_borc_alacak["durum"] = (
+            df_borc_alacak["bakiye"]
+            .apply(durum_belirle)
+        )
+
+        # ------------------------------------------
+        # GENEL TOPLAMLAR
+        # ------------------------------------------
+        toplam_satis_genel = (
+            df_borc_alacak["toplam_satis"].sum()
+        )
+
+        toplam_tahsilat_genel = (
+            df_borc_alacak["toplam_tahsilat"].sum()
+        )
+
+        genel_bakiye = (
+            toplam_satis_genel
+            - toplam_tahsilat_genel
+        )
+
+        borclu_firma_sayisi = len(
+            df_borc_alacak[
+                df_borc_alacak["bakiye"] > 0
+            ]
+        )
+
+        alacakli_firma_sayisi = len(
+            df_borc_alacak[
+                df_borc_alacak["bakiye"] < 0
+            ]
+        )
+
+        kapali_firma_sayisi = len(
+            df_borc_alacak[
+                df_borc_alacak["bakiye"] == 0
+            ]
+        )
+
+        # ------------------------------------------
+        # ÖZET
+        # ------------------------------------------
+        col1, col2, col3, col4 = st.columns(4)
+
+        with col1:
+            st.metric(
+                "🔴 Borçlu Firma",
+                borclu_firma_sayisi
+            )
+
+        with col2:
+            st.metric(
+                "🟢 Alacaklı Firma",
+                alacakli_firma_sayisi
+            )
+
+        with col3:
+            st.metric(
+                "⚪ Hesabı Kapalı",
+                kapali_firma_sayisi
+            )
+
+        with col4:
+            st.metric(
+                "💰 Genel Bakiye",
+                f"{genel_bakiye:,.2f} TL"
+            )
+
+        st.divider()
+
+        # ------------------------------------------
+        # FİRMA LİSTESİ
+        # ------------------------------------------
+        st.write("### 📋 Firma Listesi")
+
+        durum_filtresi = st.radio(
+            "Gösterilecek Firmalar",
+            [
+                "📋 Tümü",
+                "🔴 Borçlular",
+                "🟢 Alacaklılar",
+                "⚪ Hesabı Kapalı"
+            ],
+            horizontal=True,
+            key="borc_alacak_firma_filtre"
+        )
+
+        if durum_filtresi == "🔴 Borçlular":
+
+            df_goster = df_borc_alacak[
+                df_borc_alacak["bakiye"] > 0
+            ].copy()
+
+        elif durum_filtresi == "🟢 Alacaklılar":
+
+            df_goster = df_borc_alacak[
+                df_borc_alacak["bakiye"] < 0
+            ].copy()
+
+        elif durum_filtresi == "⚪ Hesabı Kapalı":
+
+            df_goster = df_borc_alacak[
+                df_borc_alacak["bakiye"] == 0
+            ].copy()
+
+        else:
+
+            df_goster = df_borc_alacak.copy()
+
+        if df_goster.empty:
+
+            st.warning(
+                "🔍 Bu duruma uygun firma bulunamadı."
+            )
+
+        else:
+
+            for _, firma in df_goster.iterrows():
+
+                firma_adi = firma["firma_adi"]
+
+                satis = float(
+                    firma["toplam_satis"]
+                )
+
+                tahsilat = float(
+                    firma["toplam_tahsilat"]
+                )
+
+                bakiye = float(
+                    firma["bakiye"]
+                )
+
+                if bakiye > 0:
+
+                    durum_text = "🔴 BORÇLU"
+
+                    bakiye_text = (
+                        f"{bakiye:,.2f} TL BORÇ"
+                    )
+
+                elif bakiye < 0:
+
+                    durum_text = "🟢 ALACAKLI"
+
+                    bakiye_text = (
+                        f"{abs(bakiye):,.2f} TL ALACAK"
+                    )
+
+                else:
+
+                    durum_text = "⚪ HESAP KAPALI"
+
+                    bakiye_text = "0.00 TL"
+
+                col_a, col_b, col_c, col_d = st.columns(
+                    [3, 2, 2, 2]
+                )
+
+                with col_a:
+                    st.write(
+                        f"**🏢 {firma_adi}**"
+                    )
+
+                with col_b:
+                    st.write(
+                        f"Satış: **{satis:,.2f} TL**"
+                    )
+
+                with col_c:
+                    st.write(
+                        f"Tahsilat: **{tahsilat:,.2f} TL**"
+                    )
+
+                with col_d:
+                    st.write(
+                        f"**{durum_text}**"
+                    )
+
+                    st.caption(
+                        bakiye_text
+                    )
+
+                st.divider()
+
+        # ------------------------------------------
+        # FİRMA DETAYI
+        # ------------------------------------------
+        st.subheader(
+            "🔎 Firma Borç / Alacak Detayı"
+        )
+
+        firma_sec = st.selectbox(
+            "Firma Seçin",
+            df_borc_alacak["firma_adi"].tolist(),
+            key="borc_alacak_detay_firma"
+        )
+
+        firma_bilgi = df_borc_alacak[
+            df_borc_alacak["firma_adi"] == firma_sec
+        ].iloc[0]
+
+        detay_satis = float(
+            firma_bilgi["toplam_satis"]
+        )
+
+        detay_tahsilat = float(
+            firma_bilgi["toplam_tahsilat"]
+        )
+
+        detay_bakiye = float(
+            firma_bilgi["bakiye"]
+        )
+
+        d1, d2, d3 = st.columns(3)
+
+        with d1:
+            st.metric(
+                "📦 Toplam Satış",
+                f"{detay_satis:,.2f} TL"
+            )
+
+        with d2:
+            st.metric(
+                "💰 Toplam Tahsilat",
+                f"{detay_tahsilat:,.2f} TL"
+            )
+
+        with d3:
+
+            if detay_bakiye > 0:
+
+                st.metric(
+                    "🔴 Kalan Borç",
+                    f"{detay_bakiye:,.2f} TL"
+                )
+
+            elif detay_bakiye < 0:
+
+                st.metric(
+                    "🟢 Alacak",
+                    f"{abs(detay_bakiye):,.2f} TL"
+                )
+
+            else:
+
+                st.metric(
+                    "⚪ Bakiye",
+                    "0.00 TL"
+                )
+
+        # ------------------------------------------
+        # İŞLEM GEÇMİŞİ
+        # ------------------------------------------
+        st.write(
+            f"### 📋 {firma_sec} İşlem Geçmişi"
+        )
+
+        df_firma_hareket = run_query_df(
+            """
+            SELECT
+                id,
+                tarih,
+                islem_turu,
+                adet,
+                birim_fiyat,
+                toplam_tutar,
+                aciklama
+            FROM toptan_satis
+            WHERE firma_adi = ?
+            ORDER BY tarih ASC, id ASC
+            """,
+            [firma_sec]
+        )
+
+        if df_firma_hareket.empty:
+
+            st.info(
+                "📭 Bu firmaya ait henüz işlem kaydı bulunmuyor."
+            )
+
+        else:
+
+            df_firma_hareket["toplam_tutar"] = pd.to_numeric(
+                df_firma_hareket["toplam_tutar"],
+                errors="coerce"
+            ).fillna(0.0)
+
+            df_firma_hareket["borc_hareket"] = (
+                df_firma_hareket.apply(
+                    lambda row:
+                        float(row["toplam_tutar"])
+                        if row["islem_turu"] == "Satış"
+                        else 0.0,
+                    axis=1
+                )
+            )
+
+            df_firma_hareket["tahsilat_hareket"] = (
+                df_firma_hareket.apply(
+                    lambda row:
+                        float(row["toplam_tutar"])
+                        if row["islem_turu"] == "Tahsilat"
+                        else 0.0,
+                    axis=1
+                )
+            )
+
+            # Kümülatif bakiye
+            df_firma_hareket["kalan_bakiye"] = (
+                df_firma_hareket["borc_hareket"]
+                - df_firma_hareket["tahsilat_hareket"]
+            ).cumsum()
+
+            df_detay_goster = df_firma_hareket[
+                [
+                    "tarih",
+                    "islem_turu",
+                    "adet",
+                    "birim_fiyat",
+                    "toplam_tutar",
+                    "kalan_bakiye",
+                    "aciklama"
+                ]
+            ].copy()
+
+            df_detay_goster.columns = [
+                "Tarih",
+                "İşlem",
+                "Adet",
+                "Birim Fiyat",
+                "Tutar",
+                "Kalan Bakiye",
+                "Açıklama"
+            ]
+
+            st.dataframe(
+                df_detay_goster,
+                use_container_width=True,
+                hide_index=True
+            )
+
+        # ------------------------------------------
+        # SON DURUM
+        # ------------------------------------------
+        st.divider()
+
+        if detay_bakiye > 0:
+
+            st.error(
+                f"🔴 **{firma_sec}** güncel olarak "
+                f"**{detay_bakiye:,.2f} TL BORÇLU**"
+            )
+
+        elif detay_bakiye < 0:
+
+            st.success(
+                f"🟢 **{firma_sec}** "
+                f"**{abs(detay_bakiye):,.2f} TL ALACAKLI**"
+            )
+
+        else:
+
+            st.info(
+                f"⚪ **{firma_sec}** hesabı kapalı. "
+                f"Borç/alacak bulunmuyor."
+            )
