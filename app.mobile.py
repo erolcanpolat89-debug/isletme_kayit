@@ -1315,7 +1315,7 @@ with alt_sekme3:
                 <tbody>
         """
 
-               # =====================================================
+            # =====================================================
         # 15. EKSTRE ÖN İZLEME
         # =====================================================
 
@@ -1330,188 +1330,323 @@ with alt_sekme3:
 
         if onizleme_ac:
 
-            # -------------------------------------------------
-            # ÖN İZLEME İÇİN GÜVENLİ HESAPLAR
-            # -------------------------------------------------
+            # =================================================
+            # 15.1 - ÖN İZLEME VERİSİNİ HAZIRLA
+            # =================================================
 
-            onizleme_satis_adedi = int(
-                df_firma_hareket[
-                    df_firma_hareket["islem_turu"] == "Satış"
-                ]["adet"]
-                .fillna(0)
-                .sum()
-            )
+            df_onizleme = df_firma_hareket.copy()
 
-            # Kümülatif adet daha önce hesaplandıysa onu kullan
-            if "Kümülatif_Adet" in df_firma_hareket.columns:
+            # Boş veri kontrolü
+            if df_onizleme.empty:
+
+                st.warning(
+                    "Bu tarih aralığında ön izlenecek işlem bulunmuyor."
+                )
+
+            else:
+
+                # -------------------------------------------------
+                # Sıralama
+                # -------------------------------------------------
+
+                df_onizleme = df_onizleme.reset_index(drop=True)
+
+
+                # -------------------------------------------------
+                # Sayısal alanları güvenli hale getir
+                # -------------------------------------------------
+
+                df_onizleme["adet"] = pd.to_numeric(
+                    df_onizleme["adet"],
+                    errors="coerce"
+                ).fillna(0).astype(int)
+
+                df_onizleme["birim_fiyat"] = pd.to_numeric(
+                    df_onizleme["birim_fiyat"],
+                    errors="coerce"
+                ).fillna(0.0)
+
+                df_onizleme["toplam_tutar"] = pd.to_numeric(
+                    df_onizleme["toplam_tutar"],
+                    errors="coerce"
+                ).fillna(0.0)
+
+
+                # =================================================
+                # 15.2 - KÜMÜLATİF ADET HESAPLA
+                # =================================================
+
+                kümülatif_adet = 0
+                kümülatif_adet_listesi = []
+
+                for _, satir in df_onizleme.iterrows():
+
+                    if satir["islem_turu"] == "Satış":
+
+                        kümülatif_adet += int(
+                            satir["adet"]
+                        )
+
+                    kümülatif_adet_listesi.append(
+                        kümülatif_adet
+                    )
+
+                df_onizleme["Kümülatif_Adet"] = (
+                    kümülatif_adet_listesi
+                )
+
+
+                # =================================================
+                # 15.3 - KALAN BAKİYE HESAPLA
+                # =================================================
+
+                kalan_bakiye = 0.0
+                kalan_bakiye_listesi = []
+
+                for _, satir in df_onizleme.iterrows():
+
+                    tutar = float(
+                        satir["toplam_tutar"]
+                    )
+
+                    if satir["islem_turu"] == "Satış":
+
+                        kalan_bakiye += tutar
+
+                    elif satir["islem_turu"] == "Tahsilat":
+
+                        kalan_bakiye -= tutar
+
+                    kalan_bakiye_listesi.append(
+                        kalan_bakiye
+                    )
+
+                df_onizleme["Kalan_Bakiye"] = (
+                    kalan_bakiye_listesi
+                )
+
+
+                # =================================================
+                # 15.4 - TOPLAM HESAPLAR
+                # =================================================
+
+                onizleme_toplam_satis = float(
+                    df_onizleme[
+                        df_onizleme["islem_turu"] == "Satış"
+                    ]["toplam_tutar"].sum()
+                )
+
+                onizleme_toplam_tahsilat = float(
+                    df_onizleme[
+                        df_onizleme["islem_turu"] == "Tahsilat"
+                    ]["toplam_tutar"].sum()
+                )
+
+                onizleme_toplam_adet = int(
+                    df_onizleme[
+                        df_onizleme["islem_turu"] == "Satış"
+                    ]["adet"].sum()
+                )
 
                 onizleme_kumulatif_adet = int(
-                    df_firma_hareket["Kümülatif_Adet"]
-                    .fillna(0)
-                    .iloc[-1]
+                    df_onizleme["Kümülatif_Adet"].iloc[-1]
                 )
 
-            else:
-
-                # Güvenli yedek hesap
-                onizleme_kumulatif_adet = onizleme_satis_adedi
-
-
-            # Devir bakiye tanımlı değilse 0 kabul et
-            try:
-                onizleme_devir_bakiye = float(
-                    devir_bakiye or 0
+                onizleme_bakiye = (
+                    onizleme_toplam_satis
+                    - onizleme_toplam_tahsilat
                 )
-            except:
-                onizleme_devir_bakiye = 0.0
 
 
-            # -------------------------------------------------
-            # ÖN İZLEME BAŞLIĞI
-            # -------------------------------------------------
+                # =================================================
+                # 15.5 - BAŞLIK
+                # =================================================
 
-            st.markdown(
-                f"""
-                <div style="
-                    border:1px solid #cccccc;
-                    border-radius:10px;
-                    padding:18px;
-                    background:white;
-                    color:#111;
-                    margin-top:10px;
-                ">
-
+                st.markdown(
+                    f"""
                     <div style="
-                        text-align:center;
-                        font-size:22px;
-                        font-weight:bold;
-                        margin-bottom:12px;
+                        border:1px solid #cccccc;
+                        border-radius:10px;
+                        padding:18px;
+                        background:white;
+                        color:#111;
+                        margin-top:10px;
                     ">
-                        MİDYECİ ABLA - CARİ HESAP EKSTRESİ
+
+                        <div style="
+                            text-align:center;
+                            font-size:22px;
+                            font-weight:bold;
+                            margin-bottom:15px;
+                        ">
+                            MİDYECİ ABLA - CARİ HESAP EKSTRESİ
+                        </div>
+
+                        <div style="
+                            font-size:14px;
+                            margin-bottom:6px;
+                        ">
+                            <b>Firma Adı:</b>
+                            {secilen_firma}
+                        </div>
+
+                        <div style="
+                            font-size:14px;
+                        ">
+                            <b>Tarih Aralığı:</b>
+                            {str_bas_tarih} / {str_bit_tarih}
+                        </div>
+
                     </div>
-
-                    <div style="
-                        font-size:14px;
-                        margin-bottom:5px;
-                    ">
-                        <b>Firma Adı:</b> {secilen_firma}
-                    </div>
-
-                    <div style="
-                        font-size:14px;
-                    ">
-                        <b>Tarih Aralığı:</b>
-                        {str_bas_tarih} / {str_bit_tarih}
-                    </div>
-
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
+                    """,
+                    unsafe_allow_html=True
+                )
 
 
-            st.markdown("### 📋 İşlem Geçmişi")
+                # =================================================
+                # 15.6 - ÖZET METRİKLER
+                # =================================================
+
+                st.markdown("### 📊 Ekstre Özeti")
+
+                onizleme_col1, onizleme_col2, onizleme_col3, onizleme_col4 = st.columns(4)
+
+                with onizleme_col1:
+
+                    st.metric(
+                        "Toplam Satış",
+                        f"{onizleme_toplam_satis:,.2f} TL"
+                    )
+
+                with onizleme_col2:
+
+                    st.metric(
+                        "Toplam Tahsilat",
+                        f"{onizleme_toplam_tahsilat:,.2f} TL"
+                    )
+
+                with onizleme_col3:
+
+                    st.metric(
+                        "Kalan Bakiye",
+                        f"{onizleme_bakiye:,.2f} TL"
+                    )
+
+                with onizleme_col4:
+
+                    st.metric(
+                        "Toplam Kümülatif Adet",
+                        f"{onizleme_kumulatif_adet:,} Adet"
+                    )
 
 
-            # -------------------------------------------------
-            # ÖN İZLEME TABLOSU
-            # -------------------------------------------------
+                # =================================================
+                # 15.7 - İŞLEM TABLOSU
+                # =================================================
 
-            if ekstre_tipi == "🔍 Detaylı":
+                st.markdown("### 📋 İşlem Geçmişi")
 
-                df_onizleme = df_firma_hareket[
-                    [
-                        "tarih",
-                        "islem_turu",
-                        "adet",
-                        "Kümülatif_Adet",
-                        "birim_fiyat",
-                        "toplam_tutar",
-                        "Kalan_Bakiye",
-                        "aciklama"
+
+                if ekstre_tipi == "🔍 Detaylı":
+
+                    df_goster = df_onizleme[
+                        [
+                            "tarih",
+                            "islem_turu",
+                            "adet",
+                            "Kümülatif_Adet",
+                            "birim_fiyat",
+                            "toplam_tutar",
+                            "Kalan_Bakiye",
+                            "aciklama"
+                        ]
+                    ].copy()
+
+                    df_goster.columns = [
+                        "Tarih",
+                        "İşlem",
+                        "Adet",
+                        "Kümülatif Adet",
+                        "Birim Fiyat",
+                        "Tutar",
+                        "Kalan Bakiye",
+                        "Açıklama"
                     ]
-                ].copy()
 
-                df_onizleme.columns = [
-                    "Tarih",
-                    "İşlem",
-                    "Adet",
-                    "Kümülatif Adet",
-                    "Birim Fiyat",
-                    "Tutar",
-                    "Kalan Bakiye",
-                    "Açıklama"
-                ]
+                else:
 
-            else:
+                    df_goster = df_onizleme[
+                        [
+                            "tarih",
+                            "islem_turu",
+                            "adet",
+                            "Kümülatif_Adet",
+                            "toplam_tutar",
+                            "Kalan_Bakiye",
+                            "aciklama"
+                        ]
+                    ].copy()
 
-                df_onizleme = df_firma_hareket[
-                    [
-                        "tarih",
-                        "islem_turu",
-                        "adet",
-                        "Kümülatif_Adet",
-                        "toplam_tutar",
-                        "Kalan_Bakiye",
-                        "aciklama"
+                    df_goster.columns = [
+                        "Tarih",
+                        "İşlem",
+                        "Adet",
+                        "Kümülatif Adet",
+                        "Tutar",
+                        "Kalan Bakiye",
+                        "Açıklama"
                     ]
-                ].copy()
-
-                df_onizleme.columns = [
-                    "Tarih",
-                    "İşlem",
-                    "Adet",
-                    "Kümülatif Adet",
-                    "Tutar",
-                    "Kalan Bakiye",
-                    "Açıklama"
-                ]
 
 
-            # -------------------------------------------------
-            # TARİH
-            # -------------------------------------------------
+                # =================================================
+                # 15.8 - GÖRÜNÜMÜ TEMİZLE
+                # =================================================
 
-            df_onizleme["Tarih"] = (
-                df_onizleme["Tarih"]
-                .astype(str)
-                .str[:10]
-            )
-
-
-            # -------------------------------------------------
-            # ADET
-            # -------------------------------------------------
-
-            df_onizleme["Adet"] = (
-                pd.to_numeric(
-                    df_onizleme["Adet"],
-                    errors="coerce"
+                df_goster["Tarih"] = (
+                    df_goster["Tarih"]
+                    .astype(str)
+                    .str[:10]
                 )
-                .fillna(0)
-                .astype(int)
-            )
 
 
-            df_onizleme["Kümülatif Adet"] = (
-                pd.to_numeric(
-                    df_onizleme["Kümülatif Adet"],
-                    errors="coerce"
-                )
-                .fillna(0)
-                .astype(int)
-            )
-
-
-            # -------------------------------------------------
-            # PARA BİÇİMLERİ
-            # -------------------------------------------------
-
-            if "Birim Fiyat" in df_onizleme.columns:
-
-                df_onizleme["Birim Fiyat"] = (
+                df_goster["Adet"] = (
                     pd.to_numeric(
-                        df_onizleme["Birim Fiyat"],
+                        df_goster["Adet"],
+                        errors="coerce"
+                    )
+                    .fillna(0)
+                    .astype(int)
+                )
+
+
+                df_goster["Kümülatif Adet"] = (
+                    pd.to_numeric(
+                        df_goster["Kümülatif Adet"],
+                        errors="coerce"
+                    )
+                    .fillna(0)
+                    .astype(int)
+                )
+
+
+                if "Birim Fiyat" in df_goster.columns:
+
+                    df_goster["Birim Fiyat"] = (
+                        pd.to_numeric(
+                            df_goster["Birim Fiyat"],
+                            errors="coerce"
+                        )
+                        .fillna(0)
+                        .map(
+                            lambda x:
+                            f"{x:,.2f} TL"
+                        )
+                    )
+
+
+                df_goster["Tutar"] = (
+                    pd.to_numeric(
+                        df_goster["Tutar"],
                         errors="coerce"
                     )
                     .fillna(0)
@@ -1522,109 +1657,82 @@ with alt_sekme3:
                 )
 
 
-            df_onizleme["Tutar"] = (
-                pd.to_numeric(
-                    df_onizleme["Tutar"],
-                    errors="coerce"
-                )
-                .fillna(0)
-                .map(
-                    lambda x:
-                    f"{x:,.2f} TL"
-                )
-            )
-
-
-            df_onizleme["Kalan Bakiye"] = (
-                pd.to_numeric(
-                    df_onizleme["Kalan Bakiye"],
-                    errors="coerce"
-                )
-                .fillna(0)
-                .map(
-                    lambda x:
-                    f"{x:,.2f} TL"
-                )
-            )
-
-
-            # -------------------------------------------------
-            # AÇIKLAMA
-            # -------------------------------------------------
-
-            df_onizleme["Açıklama"] = (
-                df_onizleme["Açıklama"]
-                .fillna("-")
-                .astype(str)
-            )
-
-
-            # -------------------------------------------------
-            # TABLOYU GÖSTER
-            # -------------------------------------------------
-
-            st.dataframe(
-                df_onizleme,
-                use_container_width=True,
-                hide_index=True
-            )
-
-
-            # -------------------------------------------------
-            # ÖZET
-            # -------------------------------------------------
-
-            st.markdown("### 📊 Ekstre Özeti")
-
-
-            onizleme_col1, onizleme_col2 = st.columns(2)
-
-
-            with onizleme_col1:
-
-                st.metric(
-                    "Devir Bakiye",
-                    f"{onizleme_devir_bakiye:,.2f} TL"
-                )
-
-                st.metric(
-                    "Toplam Satış",
-                    f"{toplam_satis:,.2f} TL"
-                )
-
-                st.metric(
-                    "Toplam Tahsilat",
-                    f"{toplam_tahsilat:,.2f} TL"
+                df_goster["Kalan Bakiye"] = (
+                    pd.to_numeric(
+                        df_goster["Kalan Bakiye"],
+                        errors="coerce"
+                    )
+                    .fillna(0)
+                    .map(
+                        lambda x:
+                        f"{x:,.2f} TL"
+                    )
                 )
 
 
-            with onizleme_col2:
-
-                st.metric(
-                    "Dönem Satış Adedi",
-                    f"{onizleme_satis_adedi:,} Adet"
-                )
-
-                st.metric(
-                    "Kümülatif Toplam Adet",
-                    f"{onizleme_kumulatif_adet:,} Adet"
-                )
-
-                st.metric(
-                    "Kalan Bakiye",
-                    f"{bakiye:,.2f} TL"
+                df_goster["Açıklama"] = (
+                    df_goster["Açıklama"]
+                    .fillna("-")
+                    .astype(str)
                 )
 
 
-            # -------------------------------------------------
-            # KULLANICIYA BİLGİ
-            # -------------------------------------------------
+                # =================================================
+                # 15.9 - ÖN İZLEME TABLOSU
+                # =================================================
 
-            st.success(
-                "✅ Ön izleme hazır. "
-                "Bilgileri kontrol ettikten sonra aşağıdaki "
-                "butondan PDF'yi indirebilirsin."
-            )
+                st.dataframe(
+                    df_goster,
+                    use_container_width=True,
+                    hide_index=True
+                )
+
+
+                # =================================================
+                # 15.10 - ALT ÖZET
+                # =================================================
+
+                st.markdown("---")
+
+                ozet_sol, ozet_sag = st.columns(2)
+
+                with ozet_sol:
+
+                    st.markdown(
+                        f"""
+                        **📦 Dönem Satış Adedi:**  
+                        {onizleme_toplam_adet:,} Adet
+
+                        **📦 Kümülatif Toplam Adet:**  
+                        {onizleme_kumulatif_adet:,} Adet
+                        """
+                    )
+
+                with ozet_sag:
+
+                    st.markdown(
+                        f"""
+                        **💰 Toplam Satış:**  
+                        {onizleme_toplam_satis:,.2f} TL
+
+                        **💵 Toplam Tahsilat:**  
+                        {onizleme_toplam_tahsilat:,.2f} TL
+
+                        **📌 Kalan Bakiye:**  
+                        {onizleme_bakiye:,.2f} TL
+                        """
+                    )
+
+
+                # =================================================
+                # 15.11 - BİLGİ
+                # =================================================
+
+                st.success(
+                    "✅ Ekstre ön izlemesi hazır. "
+                    "Bilgileri kontrol ettikten sonra "
+                    "aşağıdaki PDF/Yazdır butonunu kullanabilirsin."
+                )
 
 
         # =====================================================
