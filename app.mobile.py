@@ -1069,39 +1069,50 @@ with tab4:
             st.divider()
             st.markdown(f"### 📌 {secili_firma_detay}")
             
-            df_f_satis = run_query_df("SELECT SUM(toplam_tutar) as t FROM toptan_satis WHERE firma_adi=? AND islem_turu='Satış'", [secili_firma_detay])
-            df_f_tahsilat = run_query_df("SELECT SUM(toplam_tutar) as t FROM toptan_satis WHERE firma_adi=? AND islem_turu='Tahsilat'", [secili_firma_detay])
-            
-            tot_satis = df_f_satis['t'].iloc[0] if not df_f_satis.empty and pd.notnull(df_f_satis['t'].iloc[0]) else 0.0
-            tot_tahsilat = df_f_tahsilat['t'].iloc[0] if not df_f_tahsilat.empty and pd.notnull(df_f_tahsilat['t'].iloc[0]) else 0.0
-            net_bakiye = tot_satis - tot_tahsilat
-            
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric("Toplam Satış", f"{tot_satis:,.2f} TL")
-            with col2:
-                st.metric("Toplam Tahsilat", f"{tot_tahsilat:,.2f} TL")
-            with col3:
-                if net_bakiye > 0:
-                    st.metric("Kalan Borç", f"{net_bakiye:,.2f} TL", delta="- Borçlu", delta_color="inverse")
-                elif net_bakiye < 0:
-                    st.metric("Alacak Bakiyesi", f"{abs(net_bakiye):,.2f} TL", delta="+ Alacaklı", delta_color="normal")
-                else:
-                    st.metric("Net Bakiye", "0.00 TL", delta="Dengede")
-                
-            st.write("**İşlem Geçmişi**")
-            df_ekstre = run_query_df("""
-                SELECT tarih as 'Tarih', islem_turu as 'İşlem', adet as 'Adet', toplam_tutar as 'Tutar (TL)'
+            # 1. Bakiye hesabı düzgün devretsin diye veriyi eskiden yeniye (ASC) çekiyoruz
+            df_ekstre_raw = run_query_df("""
+                SELECT id, tarih, islem_turu, adet, birim_fiyat, toplam_tutar, aciklama
                 FROM toptan_satis 
                 WHERE firma_adi=? 
-                ORDER BY id DESC
+                ORDER BY id ASC
             """, [secili_firma_detay])
             
-            if not df_ekstre.empty:
-                st.dataframe(df_ekstre, use_container_width=True)
+            if not df_ekstre_raw.empty:
+                # 2. Satış ise borç (+), Tahsilat ise alacak (-) olarak kümülatif bakiye hesaplanıyor
+                df_ekstre_raw['Borç'] = df_ekstre_raw.apply(lambda row: row['toplam_tutar'] if row['islem_turu'] == 'Satış' else 0.0, axis=1)
+                df_ekstre_raw['Tahsilat'] = df_ekstre_raw.apply(lambda row: row['toplam_tutar'] if row['islem_turu'] == 'Tahsilat' else 0.0, axis=1)
+                
+                df_ekstre_raw['Net_Hareket'] = df_ekstre_raw['Borç'] - df_ekstre_raw['Tahsilat']
+                df_ekstre_raw['Kalan_Bakiye'] = df_ekstre_raw['Net_Hareket'].cumsum()
+                
+                # Metrikler için toplamlar
+                tot_satis = df_ekstre_raw['Borç'].sum()
+                tot_tahsilat = df_ekstre_raw['Tahsilat'].sum()
+                net_bakiye = tot_satis - tot_tahsilat
+                
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Toplam Satış", f"{tot_satis:,.2f} TL")
+                with col2:
+                    st.metric("Toplam Tahsilat", f"{tot_tahsilat:,.2f} TL")
+                with col3:
+                    if net_bakiye > 0:
+                        st.metric("Kalan Borç", f"{net_bakiye:,.2f} TL", delta="- Borçlu", delta_color="inverse")
+                    elif net_bakiye < 0:
+                        st.metric("Alacak Bakiyesi", f"{abs(net_bakiye):,.2f} TL", delta="+ Alacaklı", delta_color="normal")
+                    else:
+                        st.metric("Net Bakiye", "0.00 TL", delta="Dengede")
+                    
+                st.write("**İşlem Geçmişi**")
+                
+                # 3. Tabloda görünecek sütunları düzenliyoruz (En sağda Kalan Bakiye yer alacak)
+                df_gosterim = df_ekstre_raw[['tarih', 'islem_turu', 'adet', 'birim_fiyat', 'toplam_tutar', 'Kalan_Bakiye', 'aciklama']].copy()
+                df_gosterim.columns = ['Tarih', 'İşlem', 'Adet', 'Birim Fiyat', 'Tutar', 'Kalan Bakiye', 'Açıklama']
+                
+                # En son yapılan işlemin en üstte görünmesi için .iloc[::-1] kullanıyoruz (Hesaplamayı bozmaz)
+                st.dataframe(df_gosterim.iloc[::-1], use_container_width=True, hide_index=True)
             else:
                 st.info("İşlem hareketi bulunmuyor.")
-
 # ==========================================
 # 5. SEKME: TÜM BORÇ / ALACAK ÖZETİ (YENİ SEKME)
 # ==========================================
