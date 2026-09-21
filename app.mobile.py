@@ -1315,652 +1315,214 @@ with alt_sekme3:
                 <tbody>
         """
 
-        # -----------------------------------------------------
-        # 15. PDF SATIRLARI
-        # -----------------------------------------------------
-        for index, row in df_firma_hareket.iterrows():
-
-            tarih_html = html.escape(
-                str(row["tarih"])
-            )
-
-            islem_html = html.escape(
-                str(row["islem_turu"])
-            )
-
-            aciklama_html = (
-                html.escape(str(row["aciklama"]))
-                if pd.notna(row["aciklama"])
-                else "-"
-            )
-
-            adet = int(row["adet"])
-            kume_adet = int(row["Kümülatif_Adet"])
-
-            birim_fiyat = float(
-                row["birim_fiyat"]
-            )
-
-            tutar = float(
-                row["toplam_tutar"]
-            )
-
-            kalan_bakiye = float(
-                row["Kalan_Bakiye"]
-            )
-
-            html_content += f"""
-                    <tr>
-
-                        <td style="
-                            border: 1px solid #999;
-                            padding: 6px;
-                        ">
-                            {tarih_html}
-                        </td>
-
-                        <td style="
-                            border: 1px solid #999;
-                            padding: 6px;
-                        ">
-                            {islem_html}
-                        </td>
-            """
-
-            if ekstre_tipi == "🔍 Detaylı":
-
-                html_content += f"""
-                        <td style="
-                            border: 1px solid #999;
-                            padding: 6px;
-                            text-align: center;
-                        ">
-                            {adet:,}
-                        </td>
-
-                        <td style="
-                            border: 1px solid #999;
-                            padding: 6px;
-                            text-align: center;
-                        ">
-                            {kume_adet:,}
-                        </td>
-
-                        <td style="
-                            border: 1px solid #999;
-                            padding: 6px;
-                            text-align: right;
-                        ">
-                            {birim_fiyat:,.2f} TL
-                        </td>
-                """
-
-            else:
-
-                html_content += f"""
-                        <td style="
-                            border: 1px solid #999;
-                            padding: 6px;
-                            text-align: center;
-                        ">
-                            {adet:,}
-                        </td>
-
-                        <td style="
-                            border: 1px solid #999;
-                            padding: 6px;
-                            text-align: center;
-                        ">
-                            {kume_adet:,}
-                        </td>
-                """
-
-            html_content += f"""
-                        <td style="
-                            border: 1px solid #999;
-                            padding: 6px;
-                            text-align: right;
-                        ">
-                            {tutar:,.2f} TL
-                        </td>
-
-                        <td style="
-                            border: 1px solid #999;
-                            padding: 6px;
-                            text-align: right;
-                            font-weight: bold;
-                        ">
-                            {kalan_bakiye:,.2f} TL
-                        </td>
-
-                        <td style="
-                            border: 1px solid #999;
-                            padding: 6px;
-                        ">
-                            {aciklama_html}
-                        </td>
-
-                    </tr>
-            """
-
-        # -----------------------------------------------------
-        # 16. PDF ÖZET
-        # -----------------------------------------------------
-        html_content += f"""
-                </tbody>
-            </table>
-
-            <br>
-
-            <div style="
-                border-top: 2px solid #333;
-                padding-top: 10px;
-            ">
-
-                <h3>Özet</h3>
-
-                <p>
-                    <b>Devir Bakiye:</b>
-                    {devir_bakiye:,.2f} TL
-                </p>
-
-                <p>
-                    <b>Dönem Toplam Satış:</b>
-                    {toplam_satis:,.2f} TL
-                </p>
-
-                <p>
-                    <b>Dönem Toplam Tahsilat:</b>
-                    {toplam_tahsilat:,.2f} TL
-                </p>
-
-                <p>
-                    <b>Dönem Satış Adedi:</b>
-                    {donem_adet:,} Adet
-                </p>
-
-                <p>
-                    <b>Kümülatif Toplam Adet:</b>
-                    {toplam_adet:,} Adet
-                </p>
-
-                <p style="
-                    font-size: 16px;
-                    font-weight: bold;
-                    border-top: 1px solid #999;
-                    padding-top: 8px;
-                ">
-                    <b>Kalan Bakiye:</b>
-                    {bakiye:,.2f} TL
-                </p>
-
-            </div>
-
-        </div>
-        """
-               # -----------------------------------------------------
-        # 17. GERÇEK PDF OLUŞTURMA
-        # -----------------------------------------------------
-        import io
-        import os
-
-        from reportlab.lib import colors
-        from reportlab.lib.pagesizes import A4, landscape
-        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-        from reportlab.lib.enums import TA_CENTER, TA_LEFT
-        from reportlab.lib.units import mm
-        from reportlab.platypus import (
-            SimpleDocTemplate,
-            Table,
-            TableStyle,
-            Paragraph,
-            Spacer
-        )
-        from reportlab.pdfbase import pdfmetrics
-        from reportlab.pdfbase.ttfonts import TTFont
+                # =====================================================
+        # 15. EKSTRE ÖN İZLEME
+        # =====================================================
 
         st.markdown("---")
-        st.markdown("### 📥 Ekstreyi PDF Olarak İndir")
+        st.markdown("### 👁️ Ekstre Ön İzleme")
 
-        # -----------------------------------------------------
-        # TÜRKÇE KARAKTER DESTEKLİ FONT
-        # -----------------------------------------------------
-        font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
-        font_bold_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+        onizleme_ac = st.button(
+            "👁️ Ekstreyi Ön İzle",
+            use_container_width=True,
+            key="cari_ekstre_onizleme"
+        )
 
-        if os.path.exists(font_path):
-            pdfmetrics.registerFont(
-                TTFont("DejaVuSans", font_path)
+
+        if onizleme_ac:
+
+            st.markdown("---")
+
+            st.markdown(
+                f"""
+                <div style="
+                    text-align:center;
+                    font-family:Arial,sans-serif;
+                    padding:10px;
+                ">
+                    <h2>MİDYECİ ABLA - CARİ HESAP EKSTRESİ</h2>
+                    <p>
+                        <b>Firma Adı:</b> {secilen_firma}
+                    </p>
+                    <p>
+                        <b>Tarih Aralığı:</b>
+                        {str_bas_tarih} / {str_bit_tarih}
+                    </p>
+                </div>
+                """,
+                unsafe_allow_html=True
             )
 
-            if os.path.exists(font_bold_path):
-                pdfmetrics.registerFont(
-                    TTFont("DejaVuSans-Bold", font_bold_path)
-                )
-                normal_font = "DejaVuSans"
-                bold_font = "DejaVuSans-Bold"
-            else:
-                normal_font = "DejaVuSans"
-                bold_font = "DejaVuSans"
 
-        else:
-            normal_font = "Helvetica"
-            bold_font = "Helvetica-Bold"
-
-        # -----------------------------------------------------
-        # PDF DOSYASINI HAFIZADA OLUŞTUR
-        # -----------------------------------------------------
-        pdf_buffer = io.BytesIO()
-
-        # Çok sütun olduğu için A4 yatay
-        doc = SimpleDocTemplate(
-            pdf_buffer,
-            pagesize=landscape(A4),
-            rightMargin=8 * mm,
-            leftMargin=8 * mm,
-            topMargin=8 * mm,
-            bottomMargin=8 * mm
-        )
-
-        styles = getSampleStyleSheet()
-
-        baslik_stil = ParagraphStyle(
-            "Baslik",
-            parent=styles["Heading1"],
-            fontName=bold_font,
-            fontSize=16,
-            leading=20,
-            alignment=TA_CENTER,
-            spaceAfter=5
-        )
-
-        alt_baslik_stil = ParagraphStyle(
-            "AltBaslik",
-            parent=styles["Normal"],
-            fontName=normal_font,
-            fontSize=9,
-            leading=12,
-            alignment=TA_CENTER
-        )
-
-        normal_stil = ParagraphStyle(
-            "NormalTR",
-            parent=styles["Normal"],
-            fontName=normal_font,
-            fontSize=8,
-            leading=10
-        )
-
-        bold_stil = ParagraphStyle(
-            "BoldTR",
-            parent=styles["Normal"],
-            fontName=bold_font,
-            fontSize=8,
-            leading=10
-        )
-
-        kucuk_stil = ParagraphStyle(
-            "KucukTR",
-            parent=styles["Normal"],
-            fontName=normal_font,
-            fontSize=7,
-            leading=9
-        )
-
-        story = []
-
-        # -----------------------------------------------------
-        # BAŞLIK
-        # -----------------------------------------------------
-        story.append(
-            Paragraph(
-                "MİDYECİ ABLA - CARİ HESAP EKSTRESİ",
-                baslik_stil
-            )
-        )
-
-        story.append(
-            Paragraph(
-                f"<b>Firma:</b> {firma_html}",
-                normal_stil
-            )
-        )
-
-        story.append(
-            Paragraph(
-                f"<b>Tarih Aralığı:</b> "
-                f"{str_bas_tarih} / {str_bit_tarih}",
-                normal_stil
-            )
-        )
-
-        story.append(
-            Spacer(1, 5 * mm)
-        )
-
-        # -----------------------------------------------------
-        # TABLO BAŞLIĞI
-        # -----------------------------------------------------
-        if ekstre_tipi == "🔍 Detaylı":
-
-            tablo = [[
-                "Tarih",
-                "İşlem",
-                "Adet",
-                "Kümülatif\nAdet",
-                "Birim Fiyat",
-                "Tutar",
-                "Kalan Bakiye",
-                "Açıklama"
-            ]]
-
-        else:
-
-            tablo = [[
-                "Tarih",
-                "İşlem",
-                "Adet",
-                "Kümülatif\nAdet",
-                "Tutar",
-                "Kalan Bakiye",
-                "Açıklama"
-            ]]
-
-        # -----------------------------------------------------
-        # HAREKETLER
-        # -----------------------------------------------------
-        for index, row in df_firma_hareket.iterrows():
-
-            tarih = str(row["tarih"])[:10]
-            islem = str(row["islem_turu"])
-
-            adet = int(row["adet"])
-            kume_adet = int(row["Kümülatif_Adet"])
-
-            tutar = float(row["toplam_tutar"])
-            kalan = float(row["Kalan_Bakiye"])
-
-            aciklama = (
-                str(row["aciklama"])
-                if pd.notna(row["aciklama"])
-                else "-"
-            )
+            # -----------------------------------------------
+            # ÖN İZLEME TABLOSU
+            # -----------------------------------------------
 
             if ekstre_tipi == "🔍 Detaylı":
 
-                birim_fiyat = float(
-                    row["birim_fiyat"]
-                )
+                df_onizleme = df_firma_hareket[
+                    [
+                        "tarih",
+                        "islem_turu",
+                        "adet",
+                        "Kümülatif_Adet",
+                        "birim_fiyat",
+                        "toplam_tutar",
+                        "Kalan_Bakiye",
+                        "aciklama"
+                    ]
+                ].copy()
 
-                tablo.append([
-                    tarih,
-                    islem,
-                    f"{adet:,}",
-                    f"{kume_adet:,}",
-                    f"{birim_fiyat:,.2f} TL",
-                    f"{tutar:,.2f} TL",
-                    f"{kalan:,.2f} TL",
-                    aciklama
-                ])
+                df_onizleme.columns = [
+                    "Tarih",
+                    "İşlem",
+                    "Adet",
+                    "Kümülatif Adet",
+                    "Birim Fiyat",
+                    "Tutar",
+                    "Kalan Bakiye",
+                    "Açıklama"
+                ]
 
             else:
 
-                tablo.append([
-                    tarih,
-                    islem,
-                    f"{adet:,}",
-                    f"{kume_adet:,}",
-                    f"{tutar:,.2f} TL",
-                    f"{kalan:,.2f} TL",
-                    aciklama
-                ])
+                df_onizleme = df_firma_hareket[
+                    [
+                        "tarih",
+                        "islem_turu",
+                        "adet",
+                        "Kümülatif_Adet",
+                        "toplam_tutar",
+                        "Kalan_Bakiye",
+                        "aciklama"
+                    ]
+                ].copy()
 
-        # -----------------------------------------------------
-        # TABLO GENİŞLİKLERİ
-        # -----------------------------------------------------
-        if ekstre_tipi == "🔍 Detaylı":
+                df_onizleme.columns = [
+                    "Tarih",
+                    "İşlem",
+                    "Adet",
+                    "Kümülatif Adet",
+                    "Tutar",
+                    "Kalan Bakiye",
+                    "Açıklama"
+                ]
 
-            col_widths = [
-                25 * mm,   # Tarih
-                24 * mm,   # İşlem
-                17 * mm,   # Adet
-                22 * mm,   # Kümülatif
-                28 * mm,   # Birim fiyat
-                28 * mm,   # Tutar
-                31 * mm,   # Bakiye
-                55 * mm    # Açıklama
-            ]
 
-        else:
+            # -----------------------------------------------
+            # PARA BİÇİMLERİ
+            # -----------------------------------------------
 
-            col_widths = [
-                28 * mm,
-                28 * mm,
-                20 * mm,
-                25 * mm,
-                32 * mm,
-                35 * mm,
-                65 * mm
-            ]
+            if "Birim Fiyat" in df_onizleme.columns:
 
-        pdf_table = Table(
-            tablo,
-            colWidths=col_widths,
-            repeatRows=1
-        )
-
-        pdf_table.setStyle(
-            TableStyle([
-                (
-                    "FONTNAME",
-                    (0, 0),
-                    (-1, -1),
-                    normal_font
-                ),
-                (
-                    "FONTNAME",
-                    (0, 0),
-                    (-1, 0),
-                    bold_font
-                ),
-                (
-                    "FONTSIZE",
-                    (0, 0),
-                    (-1, -1),
-                    7
-                ),
-                (
-                    "BACKGROUND",
-                    (0, 0),
-                    (-1, 0),
-                    colors.lightgrey
-                ),
-                (
-                    "TEXTCOLOR",
-                    (0, 0),
-                    (-1, 0),
-                    colors.black
-                ),
-                (
-                    "GRID",
-                    (0, 0),
-                    (-1, -1),
-                    0.5,
-                    colors.grey
-                ),
-                (
-                    "VALIGN",
-                    (0, 0),
-                    (-1, -1),
-                    "MIDDLE"
-                ),
-                (
-                    "ALIGN",
-                    (2, 1),
-                    (6, -1),
-                    "RIGHT"
-                ),
-                (
-                    "ALIGN",
-                    (0, 0),
-                    (1, -1),
-                    "LEFT"
-                ),
-                (
-                    "TOPPADDING",
-                    (0, 0),
-                    (-1, -1),
-                    4
-                ),
-                (
-                    "BOTTOMPADDING",
-                    (0, 0),
-                    (-1, -1),
-                    4
+                df_onizleme["Birim Fiyat"] = (
+                    df_onizleme["Birim Fiyat"]
+                    .fillna(0)
+                    .map(
+                        lambda x:
+                        f"{float(x):,.2f} TL"
+                    )
                 )
-            ])
-        )
 
-        story.append(pdf_table)
 
-        story.append(
-            Spacer(1, 5 * mm)
-        )
-
-        # -----------------------------------------------------
-        # ÖZET
-        # -----------------------------------------------------
-        ozet_data = [
-            [
-                Paragraph(
-                    "<b>Devir Bakiye:</b>",
-                    normal_stil
-                ),
-                Paragraph(
-                    f"{devir_bakiye:,.2f} TL",
-                    normal_stil
+            df_onizleme["Tutar"] = (
+                df_onizleme["Tutar"]
+                .fillna(0)
+                .map(
+                    lambda x:
+                    f"{float(x):,.2f} TL"
                 )
-            ],
-            [
-                Paragraph(
-                    "<b>Dönem Toplam Satış:</b>",
-                    normal_stil
-                ),
-                Paragraph(
-                    f"{toplam_satis:,.2f} TL",
-                    normal_stil
+            )
+
+
+            df_onizleme["Kalan Bakiye"] = (
+                df_onizleme["Kalan Bakiye"]
+                .fillna(0)
+                .map(
+                    lambda x:
+                    f"{float(x):,.2f} TL"
                 )
-            ],
-            [
-                Paragraph(
-                    "<b>Dönem Toplam Tahsilat:</b>",
-                    normal_stil
-                ),
-                Paragraph(
-                    f"{toplam_tahsilat:,.2f} TL",
-                    normal_stil
+            )
+
+
+            # Açıklama boşsa -
+            if "Açıklama" in df_onizleme.columns:
+
+                df_onizleme["Açıklama"] = (
+                    df_onizleme["Açıklama"]
+                    .fillna("-")
                 )
-            ],
-            [
-                Paragraph(
-                    "<b>Dönem Satış Adedi:</b>",
-                    normal_stil
-                ),
-                Paragraph(
-                    f"{donem_adet:,} Adet",
-                    normal_stil
+
+
+            # -----------------------------------------------
+            # TABLOYU GÖSTER
+            # -----------------------------------------------
+
+            st.dataframe(
+                df_onizleme,
+                use_container_width=True,
+                hide_index=True
+            )
+
+
+            # -----------------------------------------------
+            # ÖZET
+            # -----------------------------------------------
+
+            st.markdown("### 📋 Ekstre Özeti")
+
+            onizleme_col1, onizleme_col2 = st.columns(2)
+
+            with onizleme_col1:
+
+                st.metric(
+                    "Devir Bakiye",
+                    f"{devir_bakiye:,.2f} TL"
                 )
-            ],
-            [
-                Paragraph(
-                    "<b>Kümülatif Toplam Adet:</b>",
-                    normal_stil
-                ),
-                Paragraph(
-                    f"{toplam_adet:,} Adet",
-                    normal_stil
+
+                st.metric(
+                    "Toplam Satış",
+                    f"{toplam_satis:,.2f} TL"
                 )
-            ],
-            [
-                Paragraph(
-                    "<b>KALAN BAKİYE:</b>",
-                    bold_stil
-                ),
-                Paragraph(
-                    f"<b>{bakiye:,.2f} TL</b>",
-                    bold_stil
+
+                st.metric(
+                    "Toplam Tahsilat",
+                    f"{toplam_tahsilat:,.2f} TL"
                 )
-            ]
-        ]
 
-        ozet_table = Table(
-            ozet_data,
-            colWidths=[
-                55 * mm,
-                45 * mm
-            ]
-        )
+            with onizleme_col2:
 
-        ozet_table.setStyle(
-            TableStyle([
-                (
-                    "FONTNAME",
-                    (0, 0),
-                    (-1, -1),
-                    normal_font
-                ),
-                (
-                    "GRID",
-                    (0, 0),
-                    (-1, -1),
-                    0.5,
-                    colors.grey
-                ),
-                (
-                    "VALIGN",
-                    (0, 0),
-                    (-1, -1),
-                    "MIDDLE"
-                ),
-                (
-                    "ALIGN",
-                    (1, 0),
-                    (1, -1),
-                    "RIGHT"
-                ),
-                (
-                    "TOPPADDING",
-                    (0, 0),
-                    (-1, -1),
-                    4
-                ),
-                (
-                    "BOTTOMPADDING",
-                    (0, 0),
-                    (-1, -1),
-                    4
+                st.metric(
+                    "Dönem Satış Adedi",
+                    f"{pdf_donem_adet:,} Adet"
                 )
-            ])
-        )
 
-        story.append(ozet_table)
+                st.metric(
+                    "Kümülatif Toplam Adet",
+                    f"{pdf_toplam_adet:,} Adet"
+                )
 
-        # -----------------------------------------------------
-        # PDF'Yİ OLUŞTUR
-        # -----------------------------------------------------
-        doc.build(story)
+                st.metric(
+                    "Kalan Bakiye",
+                    f"{bakiye:,.2f} TL"
+                )
 
-        pdf_buffer.seek(0)
 
-        pdf_data = pdf_buffer.getvalue()
+            st.success(
+                "✅ Ön izleme hazır. "
+                "Bilgileri kontrol ettikten sonra aşağıdaki "
+                "butondan PDF'yi indirebilirsin."
+            )
 
-        # -----------------------------------------------------
-        # TELEFON + PC İNDİRME BUTONU
-        # -----------------------------------------------------
-        dosya_adi = (
-            f"Cari_Ekstre_"
-            f"{secilen_firma.replace(' ', '_')}_"
-            f"{str_bas_tarih}_{str_bit_tarih}.pdf"
+
+        # =====================================================
+        # 16. PDF İNDİR
+        # =====================================================
+
+        st.markdown("---")
+
+        st.markdown(
+            "### 📥 PDF'yi Kaydet"
         )
 
         st.download_button(
