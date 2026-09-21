@@ -821,7 +821,7 @@ with tab2:
                         st.warning("Kayıt silindi!")
                         st.rerun()
 
-      # ---------------------------------------------------------
+# ---------------------------------------------------------
 # 3. ALT SEKME: CARİ EKSTRE & PDF RAPORLAR
 # ---------------------------------------------------------
 with alt_sekme3:
@@ -1208,6 +1208,9 @@ with alt_sekme3:
 
             import html
             import json
+            import io
+            import os
+
             import streamlit.components.v1 as components
 
             firma_html = html.escape(
@@ -1643,129 +1646,734 @@ td {{
 
                 st.success(
                     "✅ Ön izleme hazır. "
-                    "Ekstreyi kontrol ettikten sonra "
-                    "aşağıdaki PDF butonunu kullanabilirsin."
+                    "Aşağıdaki butondan PDF'yi direkt indirebilirsin."
                 )
 
             # =================================================
-            # 17. PDF / YAZDIR BUTONU
+            # 17. DOĞRUDAN PDF İNDİRME
             # =================================================
 
             st.markdown("---")
 
             st.markdown(
-                "### 🖨️ PDF / Yazdırma"
+                "### 📥 PDF İNDİR"
             )
 
-            # HTML içeriğini JavaScript içinde güvenli
-            # şekilde kullanmak için JSON'a çeviriyoruz.
-            html_js = json.dumps(
-                html_content,
-                ensure_ascii=False
+            st.info(
+                "📱 Ön izlemede gördüğün aynı firma, tarih aralığı "
+                "ve hareket bilgileri PDF olarak hazırlanır."
             )
 
-            print_button_html = f"""
-<!DOCTYPE html>
-<html lang="tr">
+            # =================================================
+            # REPORTLAB İLE PDF OLUŞTUR
+            # =================================================
 
-<head>
+            try:
 
-<meta charset="UTF-8">
+                from reportlab.lib import colors
+                from reportlab.lib.pagesizes import A4
+                from reportlab.lib.styles import getSampleStyleSheet
+                from reportlab.lib.enums import TA_CENTER, TA_RIGHT
+                from reportlab.lib.units import mm
+                from reportlab.platypus import (
+                    SimpleDocTemplate,
+                    Paragraph,
+                    Spacer,
+                    Table,
+                    TableStyle,
+                    PageBreak
+                )
+                from reportlab.pdfbase import pdfmetrics
+                from reportlab.pdfbase.ttfonts import TTFont
 
-<style>
+                # ---------------------------------------------
+                # TÜRKÇE FONT BUL
+                # ---------------------------------------------
 
-body {{
-    margin: 0;
-    padding: 0;
-    background: transparent;
-}}
+                font_regular = None
+                font_bold = None
 
-button {{
-    width: 100%;
-    background: #ff4b4b;
-    color: white;
-    padding: 13px 20px;
-    border: none;
-    border-radius: 7px;
-    cursor: pointer;
-    font-size: 16px;
-    font-weight: bold;
-}}
+                font_konumlari = [
+                    (
+                        "DejaVuSans",
+                        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+                        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+                    ),
+                    (
+                        "DejaVuSans",
+                        "/usr/share/fonts/dejavu/DejaVuSans.ttf",
+                        "/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf"
+                    ),
+                    (
+                        "Arial",
+                        "C:/Windows/Fonts/arial.ttf",
+                        "C:/Windows/Fonts/arialbd.ttf"
+                    )
+                ]
 
-button:hover {{
-    opacity: 0.9;
-}}
+                for font_adi, normal_yol, bold_yol in font_konumlari:
 
-</style>
+                    if (
+                        os.path.exists(normal_yol)
+                        and os.path.exists(bold_yol)
+                    ):
 
-</head>
+                        try:
 
-<body>
+                            pdfmetrics.registerFont(
+                                TTFont(
+                                    font_adi,
+                                    normal_yol
+                                )
+                            )
 
-<button onclick="pdfAc()">
-    📥 Ekstreyi Aç / PDF Olarak Kaydet
-</button>
+                            pdfmetrics.registerFont(
+                                TTFont(
+                                    font_adi + "-Bold",
+                                    bold_yol
+                                )
+                            )
 
-<script>
+                            font_regular = font_adi
+                            font_bold = font_adi + "-Bold"
 
-function pdfAc() {{
+                            break
 
-    var htmlContent = {html_js};
+                        except Exception:
+                            continue
 
-    var yeniPencere = window.open(
-        "",
-        "_blank"
-    );
+                # ---------------------------------------------
+                # FONT BULUNAMAZSA
+                # ---------------------------------------------
 
-    if (!yeniPencere) {{
+                if font_regular is None:
 
-        alert(
-            "Yeni pencere açılamadı. " +
-            "Tarayıcı açılır pencereye izin vermiyor olabilir."
-        );
+                    font_regular = "Helvetica"
+                    font_bold = "Helvetica-Bold"
 
-        return;
-    }}
+                # ---------------------------------------------
+                # PDF BELLEĞİ
+                # ---------------------------------------------
 
-    yeniPencere.document.open();
+                pdf_buffer = io.BytesIO()
 
-    yeniPencere.document.write(
-        htmlContent
-    );
+                # ---------------------------------------------
+                # PDF BELGESİ
+                # ---------------------------------------------
 
-    yeniPencere.document.close();
+                pdf_doc = SimpleDocTemplate(
+                    pdf_buffer,
+                    pagesize=A4,
+                    rightMargin=10 * mm,
+                    leftMargin=10 * mm,
+                    topMargin=10 * mm,
+                    bottomMargin=10 * mm,
+                    title="Midyeci Abla Cari Hesap Ekstresi",
+                    author="Midyeci Abla"
+                )
 
-    yeniPencere.focus();
+                styles = getSampleStyleSheet()
 
-    setTimeout(
-        function() {{
+                baslik_stil = styles["Title"].clone(
+                    "BaslikStil"
+                )
 
-            yeniPencere.print();
+                baslik_stil.fontName = font_bold
+                baslik_stil.fontSize = 16
+                baslik_stil.leading = 19
+                baslik_stil.alignment = TA_CENTER
+                baslik_stil.spaceAfter = 5
 
-        }},
-        700
-    );
+                altbaslik_stil = styles["Normal"].clone(
+                    "AltBaslikStil"
+                )
 
-}}
+                altbaslik_stil.fontName = font_regular
+                altbaslik_stil.fontSize = 9
+                altbaslik_stil.leading = 11
+                altbaslik_stil.alignment = TA_CENTER
+                altbaslik_stil.spaceAfter = 10
 
-</script>
+                bilgi_stil = styles["Normal"].clone(
+                    "BilgiStil"
+                )
 
-</body>
+                bilgi_stil.fontName = font_regular
+                bilgi_stil.fontSize = 9
+                bilgi_stil.leading = 12
 
-</html>
-"""
+                hucre_stil = styles["Normal"].clone(
+                    "HucreStil"
+                )
 
-            components.html(
-                print_button_html,
-                height=65,
-                scrolling=False
-            )
+                hucre_stil.fontName = font_regular
+                hucre_stil.fontSize = 7
+                hucre_stil.leading = 9
 
-            st.caption(
-                "📱 Telefonda butona bastığında ekstre ayrı bir "
-                "yazdırma/PDF ekranında açılır. Buradan "
-                "“PDF olarak kaydet” seçeneğini kullanabilirsin."
-            )
+                hucre_bold_stil = styles["Normal"].clone(
+                    "HucreBoldStil"
+                )
+
+                hucre_bold_stil.fontName = font_bold
+                hucre_bold_stil.fontSize = 7
+                hucre_bold_stil.leading = 9
+
+                # ---------------------------------------------
+                # PDF İÇERİĞİ
+                # ---------------------------------------------
+
+                pdf_elements = []
+
+                pdf_elements.append(
+                    Paragraph(
+                        "MİDYECİ ABLA - CARİ HESAP EKSTRESİ",
+                        baslik_stil
+                    )
+                )
+
+                pdf_elements.append(
+                    Paragraph(
+                        f"<b>Rapor Türü:</b> "
+                        f"{html.escape(str(ekstre_tipi))}",
+                        altbaslik_stil
+                    )
+                )
+
+                pdf_elements.append(
+                    Paragraph(
+                        f"<b>Firma Adı:</b> "
+                        f"{firma_html}",
+                        bilgi_stil
+                    )
+                )
+
+                pdf_elements.append(
+                    Paragraph(
+                        f"<b>Tarih Aralığı:</b> "
+                        f"{str_bas_tarih} / {str_bit_tarih}",
+                        bilgi_stil
+                    )
+                )
+
+                pdf_elements.append(
+                    Paragraph(
+                        f"<b>Devir Bakiye:</b> "
+                        f"{devir_bakiye:,.2f} TL",
+                        bilgi_stil
+                    )
+                )
+
+                pdf_elements.append(
+                    Spacer(1, 8)
+                )
+
+                # ---------------------------------------------
+                # PDF TABLO BAŞLIĞI
+                # ---------------------------------------------
+
+                if ekstre_tipi == "🔍 Detaylı":
+
+                    pdf_data = [[
+                        Paragraph("Tarih", hucre_bold_stil),
+                        Paragraph("İşlem", hucre_bold_stil),
+                        Paragraph("Adet", hucre_bold_stil),
+                        Paragraph("Kümülatif Adet", hucre_bold_stil),
+                        Paragraph("Birim Fiyat", hucre_bold_stil),
+                        Paragraph("Tutar", hucre_bold_stil),
+                        Paragraph("Kalan Bakiye", hucre_bold_stil),
+                        Paragraph("Açıklama", hucre_bold_stil)
+                    ]]
+
+                else:
+
+                    pdf_data = [[
+                        Paragraph("Tarih", hucre_bold_stil),
+                        Paragraph("İşlem", hucre_bold_stil),
+                        Paragraph("Adet", hucre_bold_stil),
+                        Paragraph("Kümülatif Adet", hucre_bold_stil),
+                        Paragraph("Tutar", hucre_bold_stil),
+                        Paragraph("Kalan Bakiye", hucre_bold_stil),
+                        Paragraph("Açıklama", hucre_bold_stil)
+                    ]]
+
+                # ---------------------------------------------
+                # PDF TABLO SATIRLARI
+                # ---------------------------------------------
+
+                for index, row in df_firma_hareket.iterrows():
+
+                    try:
+                        tarih_pdf = str(
+                            row["tarih"]
+                        )[:10]
+                    except Exception:
+                        tarih_pdf = "-"
+
+                    try:
+                        islem_pdf = html.escape(
+                            str(row["islem_turu"])
+                        )
+                    except Exception:
+                        islem_pdf = "-"
+
+                    try:
+                        adet_pdf = int(
+                            float(row["adet"])
+                        )
+                    except Exception:
+                        adet_pdf = 0
+
+                    try:
+                        kumulatif_pdf = int(
+                            float(
+                                row["Kümülatif_Adet"]
+                            )
+                        )
+                    except Exception:
+                        kumulatif_pdf = 0
+
+                    try:
+                        birim_pdf = float(
+                            row["birim_fiyat"]
+                        )
+                    except Exception:
+                        birim_pdf = 0.0
+
+                    try:
+                        tutar_pdf = float(
+                            row["toplam_tutar"]
+                        )
+                    except Exception:
+                        tutar_pdf = 0.0
+
+                    try:
+                        bakiye_pdf = float(
+                            row["Kalan_Bakiye"]
+                        )
+                    except Exception:
+                        bakiye_pdf = 0.0
+
+                    if (
+                        pd.isna(row["aciklama"])
+                        or str(row["aciklama"]).strip() == ""
+                    ):
+
+                        aciklama_pdf = "-"
+
+                    else:
+
+                        aciklama_pdf = html.escape(
+                            str(row["aciklama"])
+                        )
+
+                    if ekstre_tipi == "🔍 Detaylı":
+
+                        pdf_data.append([
+                            Paragraph(
+                                tarih_pdf,
+                                hucre_stil
+                            ),
+                            Paragraph(
+                                islem_pdf,
+                                hucre_stil
+                            ),
+                            Paragraph(
+                                f"{adet_pdf:,}",
+                                hucre_stil
+                            ),
+                            Paragraph(
+                                f"{kumulatif_pdf:,}",
+                                hucre_stil
+                            ),
+                            Paragraph(
+                                f"{birim_pdf:,.2f} TL",
+                                hucre_stil
+                            ),
+                            Paragraph(
+                                f"{tutar_pdf:,.2f} TL",
+                                hucre_stil
+                            ),
+                            Paragraph(
+                                f"{bakiye_pdf:,.2f} TL",
+                                hucre_stil
+                            ),
+                            Paragraph(
+                                aciklama_pdf,
+                                hucre_stil
+                            )
+                        ])
+
+                    else:
+
+                        pdf_data.append([
+                            Paragraph(
+                                tarih_pdf,
+                                hucre_stil
+                            ),
+                            Paragraph(
+                                islem_pdf,
+                                hucre_stil
+                            ),
+                            Paragraph(
+                                f"{adet_pdf:,}",
+                                hucre_stil
+                            ),
+                            Paragraph(
+                                f"{kumulatif_pdf:,}",
+                                hucre_stil
+                            ),
+                            Paragraph(
+                                f"{tutar_pdf:,.2f} TL",
+                                hucre_stil
+                            ),
+                            Paragraph(
+                                f"{bakiye_pdf:,.2f} TL",
+                                hucre_stil
+                            ),
+                            Paragraph(
+                                aciklama_pdf,
+                                hucre_stil
+                            )
+                        ])
+
+                # ---------------------------------------------
+                # TABLO GENİŞLİĞİ
+                # ---------------------------------------------
+
+                if ekstre_tipi == "🔍 Detaylı":
+
+                    kolon_genislikleri = [
+                        22 * mm,
+                        20 * mm,
+                        13 * mm,
+                        22 * mm,
+                        24 * mm,
+                        24 * mm,
+                        25 * mm,
+                        35 * mm
+                    ]
+
+                else:
+
+                    kolon_genislikleri = [
+                        24 * mm,
+                        22 * mm,
+                        15 * mm,
+                        24 * mm,
+                        27 * mm,
+                        28 * mm,
+                        45 * mm
+                    ]
+
+                pdf_tablo = Table(
+                    pdf_data,
+                    colWidths=kolon_genislikleri,
+                    repeatRows=1,
+                    splitByRow=1
+                )
+
+                pdf_tablo.setStyle(
+                    TableStyle([
+                        (
+                            "BACKGROUND",
+                            (0, 0),
+                            (-1, 0),
+                            colors.HexColor("#eeeeee")
+                        ),
+                        (
+                            "TEXTCOLOR",
+                            (0, 0),
+                            (-1, 0),
+                            colors.black
+                        ),
+                        (
+                            "FONTNAME",
+                            (0, 0),
+                            (-1, 0),
+                            font_bold
+                        ),
+                        (
+                            "FONTNAME",
+                            (0, 1),
+                            (-1, -1),
+                            font_regular
+                        ),
+                        (
+                            "GRID",
+                            (0, 0),
+                            (-1, -1),
+                            0.5,
+                            colors.HexColor("#777777")
+                        ),
+                        (
+                            "VALIGN",
+                            (0, 0),
+                            (-1, -1),
+                            "MIDDLE"
+                        ),
+                        (
+                            "ALIGN",
+                            (2, 1),
+                            (3, -1),
+                            "CENTER"
+                        ),
+                        (
+                            "ALIGN",
+                            (4, 1),
+                            (-2, -1),
+                            "RIGHT"
+                        ),
+                        (
+                            "LEFTPADDING",
+                            (0, 0),
+                            (-1, -1),
+                            3
+                        ),
+                        (
+                            "RIGHTPADDING",
+                            (0, 0),
+                            (-1, -1),
+                            3
+                        ),
+                        (
+                            "TOPPADDING",
+                            (0, 0),
+                            (-1, -1),
+                            3
+                        ),
+                        (
+                            "BOTTOMPADDING",
+                            (0, 0),
+                            (-1, -1),
+                            3
+                        )
+                    ])
+                )
+
+                pdf_elements.append(
+                    pdf_tablo
+                )
+
+                # ---------------------------------------------
+                # PDF ÖZET
+                # ---------------------------------------------
+
+                pdf_elements.append(
+                    Spacer(1, 12)
+                )
+
+                pdf_elements.append(
+                    Paragraph(
+                        "Ekstre Özeti",
+                        hucre_bold_stil
+                    )
+                )
+
+                pdf_elements.append(
+                    Spacer(1, 4)
+                )
+
+                ozet_data = [
+                    [
+                        Paragraph(
+                            "Devir Bakiye",
+                            hucre_bold_stil
+                        ),
+                        Paragraph(
+                            f"{devir_bakiye:,.2f} TL",
+                            hucre_stil
+                        )
+                    ],
+                    [
+                        Paragraph(
+                            "Dönem Toplam Satış",
+                            hucre_bold_stil
+                        ),
+                        Paragraph(
+                            f"{toplam_satis:,.2f} TL",
+                            hucre_stil
+                        )
+                    ],
+                    [
+                        Paragraph(
+                            "Dönem Toplam Tahsilat",
+                            hucre_bold_stil
+                        ),
+                        Paragraph(
+                            f"{toplam_tahsilat:,.2f} TL",
+                            hucre_stil
+                        )
+                    ],
+                    [
+                        Paragraph(
+                            "Dönem Satış Adedi",
+                            hucre_bold_stil
+                        ),
+                        Paragraph(
+                            f"{donem_adet:,} Adet",
+                            hucre_stil
+                        )
+                    ],
+                    [
+                        Paragraph(
+                            "Kümülatif Toplam Adet",
+                            hucre_bold_stil
+                        ),
+                        Paragraph(
+                            f"{toplam_adet:,} Adet",
+                            hucre_stil
+                        )
+                    ],
+                    [
+                        Paragraph(
+                            "Kalan Bakiye",
+                            hucre_bold_stil
+                        ),
+                        Paragraph(
+                            f"{bakiye:,.2f} TL",
+                            hucre_bold_stil
+                        )
+                    ]
+                ]
+
+                ozet_tablo = Table(
+                    ozet_data,
+                    colWidths=[
+                        70 * mm,
+                        50 * mm
+                    ]
+                )
+
+                ozet_tablo.setStyle(
+                    TableStyle([
+                        (
+                            "GRID",
+                            (0, 0),
+                            (-1, -1),
+                            0.5,
+                            colors.HexColor("#999999")
+                        ),
+                        (
+                            "VALIGN",
+                            (0, 0),
+                            (-1, -1),
+                            "MIDDLE"
+                        ),
+                        (
+                            "BACKGROUND",
+                            (0, 0),
+                            (0, -1),
+                            colors.HexColor("#eeeeee")
+                        ),
+                        (
+                            "ALIGN",
+                            (1, 0),
+                            (1, -1),
+                            "RIGHT"
+                        ),
+                        (
+                            "LEFTPADDING",
+                            (0, 0),
+                            (-1, -1),
+                            5
+                        ),
+                        (
+                            "RIGHTPADDING",
+                            (0, 0),
+                            (-1, -1),
+                            5
+                        ),
+                        (
+                            "TOPPADDING",
+                            (0, 0),
+                            (-1, -1),
+                            5
+                        ),
+                        (
+                            "BOTTOMPADDING",
+                            (0, 0),
+                            (-1, -1),
+                            5
+                        )
+                    ])
+                )
+
+                pdf_elements.append(
+                    ozet_tablo
+                )
+
+                # ---------------------------------------------
+                # PDF OLUŞTUR
+                # ---------------------------------------------
+
+                pdf_doc.build(
+                    pdf_elements
+                )
+
+                pdf_bytes = pdf_buffer.getvalue()
+
+                pdf_buffer.close()
+
+                # ---------------------------------------------
+                # DOSYA ADI
+                # ---------------------------------------------
+
+                temiz_firma_adi = "".join(
+                    c
+                    for c in str(secilen_firma)
+                    if c.isalnum()
+                    or c in (
+                        " ",
+                        "_",
+                        "-"
+                    )
+                ).strip()
+
+                if not temiz_firma_adi:
+                    temiz_firma_adi = "Firma"
+
+                pdf_dosya_adi = (
+                    f"cari_ekstre_"
+                    f"{temiz_firma_adi}_"
+                    f"{str_bas_tarih}_"
+                    f"{str_bit_tarih}.pdf"
+                )
+
+                # ---------------------------------------------
+                # DOĞRUDAN PDF İNDİR
+                # ---------------------------------------------
+
+                st.download_button(
+                    label="📥 PDF'Yİ DİREKT İNDİR",
+                    data=pdf_bytes,
+                    file_name=pdf_dosya_adi,
+                    mime="application/pdf",
+                    use_container_width=True,
+                    key="cari_ekstre_pdf_indir"
+                )
+
+                st.caption(
+                    "✅ Bu buton yazdırma ekranı açmaz. "
+                    "PDF dosyasını doğrudan indirir."
+                )
+
+            except ImportError:
+
+                st.error(
+                    "❌ PDF modülü bulunamadı. "
+                    "Lütfen requirements.txt dosyana "
+                    "'reportlab' satırını ekle."
+                )
+
+            except Exception as pdf_hata:
+
+                st.error(
+                    "❌ PDF oluşturulurken hata oluştu."
+                )
+
+                st.code(
+                    str(pdf_hata)
+                )
 
         # =====================================================
         # 18. HAREKET YOKSA
