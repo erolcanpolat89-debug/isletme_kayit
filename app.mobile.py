@@ -1686,30 +1686,101 @@ td {{
                 from reportlab.pdfbase import pdfmetrics
                 from reportlab.pdfbase.ttfonts import TTFont
 
-                # ---------------------------------------------
+                                # ---------------------------------------------
                 # TÜRKÇE FONT BUL
                 # ---------------------------------------------
 
                 font_regular = None
                 font_bold = None
 
+                # Türkçe karakterleri destekleyen fontları
+                # mümkün olan farklı sistem yollarından arıyoruz.
                 font_konumlari = [
+
+                    # -----------------------------------------
+                    # NOTO SANS
+                    # -----------------------------------------
+
+                    (
+                        "NotoSans",
+                        "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
+                        "/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf"
+                    ),
+
+                    (
+                        "NotoSans",
+                        "/usr/share/fonts/opentype/noto/NotoSans-Regular.ttf",
+                        "/usr/share/fonts/opentype/noto/NotoSans-Bold.ttf"
+                    ),
+
+                    (
+                        "NotoSans",
+                        "/usr/share/fonts/truetype/noto/NotoSans-Regular.otf",
+                        "/usr/share/fonts/truetype/noto/NotoSans-Bold.otf"
+                    ),
+
+                    # -----------------------------------------
+                    # DEJAVU SANS
+                    # -----------------------------------------
+
                     (
                         "DejaVuSans",
                         "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
                         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
                     ),
+
                     (
                         "DejaVuSans",
                         "/usr/share/fonts/dejavu/DejaVuSans.ttf",
                         "/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf"
                     ),
+
+                    # -----------------------------------------
+                    # LIBERATION SANS
+                    # -----------------------------------------
+
+                    (
+                        "LiberationSans",
+                        "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
+                        "/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf"
+                    ),
+
+                    (
+                        "LiberationSans",
+                        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+                        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"
+                    ),
+
+                    # -----------------------------------------
+                    # FREE SANS
+                    # -----------------------------------------
+
+                    (
+                        "FreeSans",
+                        "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
+                        "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf"
+                    ),
+
+                    # -----------------------------------------
+                    # WINDOWS ARIAL
+                    # -----------------------------------------
+
                     (
                         "Arial",
                         "C:/Windows/Fonts/arial.ttf",
                         "C:/Windows/Fonts/arialbd.ttf"
+                    ),
+
+                    (
+                        "Arial",
+                        "C:/Windows/Fonts/Arial.ttf",
+                        "C:/Windows/Fonts/Arialbd.ttf"
                     )
                 ]
+
+                # ---------------------------------------------
+                # UYGUN FONTU BUL VE KAYDET
+                # ---------------------------------------------
 
                 for font_adi, normal_yol, bold_yol in font_konumlari:
 
@@ -1720,6 +1791,28 @@ td {{
 
                         try:
 
+                            # Font daha önce kayıtlıysa
+                            # tekrar kayıt etmiyoruz.
+                            try:
+
+                                pdfmetrics.getFont(
+                                    font_adi
+                                )
+
+                                pdfmetrics.getFont(
+                                    font_adi + "-Bold"
+                                )
+
+                                font_regular = font_adi
+                                font_bold = font_adi + "-Bold"
+
+                                break
+
+                            except Exception:
+
+                                pass
+
+                            # Normal font
                             pdfmetrics.registerFont(
                                 TTFont(
                                     font_adi,
@@ -1727,6 +1820,7 @@ td {{
                                 )
                             )
 
+                            # Kalın font
                             pdfmetrics.registerFont(
                                 TTFont(
                                     font_adi + "-Bold",
@@ -1740,16 +1834,22 @@ td {{
                             break
 
                         except Exception:
+
                             continue
 
                 # ---------------------------------------------
-                # FONT BULUNAMAZSA
+                # TÜRKÇE FONT BULUNAMADIYSA
                 # ---------------------------------------------
 
                 if font_regular is None:
 
-                    font_regular = "Helvetica"
-                    font_bold = "Helvetica-Bold"
+                    st.error(
+                        "❌ Türkçe karakter destekleyen PDF fontu "
+                        "bulunamadı. Noto Sans, DejaVu Sans veya "
+                        "Liberation Sans gerekli."
+                    )
+
+                    st.stop()
 
                 # ---------------------------------------------
                 # PDF BELLEĞİ
