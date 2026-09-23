@@ -176,6 +176,71 @@ st.markdown(f"""
     div[role="radiogroup"] label div[data-testid="stMarkdownContainer"] p {{
         color: #ffffff !important;
     }}
+    /* =========================================================
+       MODERN ISLEM MENUSU - RADIO BUTONLARINI PROFESYONEL PILL
+       ========================================================= */
+    div[data-testid="stRadio"] div[role="radiogroup"] {{
+        display: flex !important;
+        flex-wrap: wrap !important;
+        gap: 10px !important;
+        align-items: center !important;
+        padding: 8px 0 !important;
+    }}
+
+    div[data-testid="stRadio"] div[role="radiogroup"] > label {{
+        position: relative !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        min-height: 46px !important;
+        padding: 8px 16px !important;
+        margin: 0 !important;
+        border: 1px solid rgba(255,255,255,0.18) !important;
+        border-radius: 14px !important;
+        background: linear-gradient(135deg, rgba(17,24,39,0.94), rgba(30,41,59,0.82)) !important;
+        box-shadow: 0 5px 14px rgba(0,0,0,0.28), inset 0 0 12px rgba(255,255,255,0.025) !important;
+        cursor: pointer !important;
+        transition: all 0.22s ease !important;
+    }}
+
+    div[data-testid="stRadio"] div[role="radiogroup"] > label:hover {{
+        transform: translateY(-2px) !important;
+        border-color: rgba(255,210,70,0.75) !important;
+        background: linear-gradient(135deg, rgba(70,52,18,0.95), rgba(31,41,55,0.92)) !important;
+        box-shadow: 0 7px 20px rgba(212,175,55,0.22), 0 0 12px rgba(255,210,70,0.18) !important;
+    }}
+
+    div[data-testid="stRadio"] div[role="radiogroup"] > label:has(input:checked) {{
+        border-color: #ffd84d !important;
+        background: linear-gradient(135deg, #b8860b, #6f5317) !important;
+        box-shadow: 0 0 12px rgba(255,216,77,0.48), inset 0 0 14px rgba(255,235,150,0.12) !important;
+        transform: translateY(-1px) !important;
+    }}
+
+    div[data-testid="stRadio"] div[role="radiogroup"] > label:has(input:checked) div[data-testid="stMarkdownContainer"] p {{
+        color: #ffffff !important;
+        text-shadow: 0 1px 5px rgba(0,0,0,0.9) !important;
+    }}
+
+    div[data-testid="stRadio"] div[role="radiogroup"] > label input {{
+        accent-color: #ffd84d !important;
+        margin-right: 8px !important;
+    }}
+
+    div[data-testid="stRadio"] div[role="radiogroup"] > label div[data-testid="stMarkdownContainer"] p {{
+        margin: 0 !important;
+        font-size: 14px !important;
+        font-weight: 800 !important;
+        white-space: nowrap !important;
+    }}
+
+    @media (max-width: 800px) {{
+        div[data-testid="stRadio"] div[role="radiogroup"] > label {{
+            flex: 1 1 calc(50% - 10px) !important;
+            min-width: 145px !important;
+        }}
+    }}
+
 
     /* TARİH VE INPUT KUTULARI */
     div[data-baseweb="input"] input, 
