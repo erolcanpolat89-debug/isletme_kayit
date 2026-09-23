@@ -384,6 +384,15 @@ st.markdown("""
 # =========================================================
 # PROFESYONEL RAPOR / PDF YARDIMCILARI
 # =========================================================
+def _tr_now():
+    """Türkiye saatini güvenli şekilde döndürür."""
+    try:
+        return datetime.now(ZoneInfo("Europe/Istanbul"))
+    except Exception:
+        # ZoneInfo kullanılamazsa uygulama yine çalışsın.
+        return datetime.now()
+
+
 def _money(value):
     try:
         return f"{float(value or 0):,.2f} TL"
