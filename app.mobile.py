@@ -507,7 +507,7 @@ def build_toptan_pdf(df, firma, bas_tarih, bit_tarih, devir, satis, tahsilat, ba
         ("LEFTPADDING", (0,0), (-1,-1), 4), ("RIGHTPADDING", (0,0), (-1,-1), 4),
         ("TOPPADDING", (0,0), (-1,-1), 4), ("BOTTOMPADDING", (0,0), (-1,-1), 4),
     ]))
-    story += [table, Spacer(1, 5*mm), Paragraph("FİRMA EKSTRESİ EROL CANPOLAT TARAFINDAN OLUŞTULMUŞTUR.", styles["TRSmall"])]
+    story += [table, Spacer(1, 5*mm), Paragraph("Bakiye hesabı: Satışlar borç ekler, tahsilatlar borcu düşürür.", styles["TRSmall"])]
     doc.build(story, onFirstPage=_pdf_header, onLaterPages=_pdf_header)
     buf.seek(0)
     return buf.getvalue()
@@ -1228,17 +1228,35 @@ with tab4:
             m3.metric("📈 Net", _money(net))
             m4.metric("🧾 İşlem", f"{len(df_rduk):,}")
 
+            st.markdown(
+                f"""
+                <div style="margin:14px 0 18px 0;padding:12px 16px;border:1px solid rgba(255,210,70,.55);border-radius:14px;background:rgba(15,18,28,.88);text-align:center;box-shadow:0 0 18px rgba(255,200,60,.12);">
+                    📅 <b>SEÇİLEN RAPOR ARALIĞI</b>
+                    <span style="margin-left:10px;font-size:18px;font-weight:800;">{rapor_bas.strftime('%d.%m.%Y')} → {rapor_bit.strftime('%d.%m.%Y')}</span>
+                    <span style="margin-left:10px;">• {rapor_kat if rapor_kat != 'Tümü' else 'Tüm Kategoriler'}</span>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
             if not df_rduk.empty:
                 st.markdown("#### 📅 Günlük Özet")
-                df_gun = run_query_df("""
+                q_gun = """
                     SELECT SUBSTR(tarih,1,10) AS 'Tarih',
                            SUM(CASE WHEN islem_tipi='Günlük Satış (Gelir)' THEN tutar ELSE 0 END) AS 'Gelir',
                            SUM(CASE WHEN islem_tipi='Dükkan Gideri (Gider)' THEN tutar ELSE 0 END) AS 'Gider'
                     FROM dukkan_hareket
                     WHERE SUBSTR(tarih,1,10) BETWEEN ? AND ?
+                """
+                p_gun = [rb, re_]
+                if rapor_kat != "Tümü":
+                    q_gun += " AND kategori = ?"
+                    p_gun.append(rapor_kat)
+                q_gun += """
                     GROUP BY SUBSTR(tarih,1,10)
                     ORDER BY SUBSTR(tarih,1,10) ASC
-                """, [rb, re_])
+                """
+                df_gun = run_query_df(q_gun, p_gun)
                 if not df_gun.empty:
                     df_gun["Net"] = df_gun["Gelir"].fillna(0) - df_gun["Gider"].fillna(0)
                     for col in ["Gelir", "Gider", "Net"]:
@@ -1251,16 +1269,23 @@ with tab4:
                 st.dataframe(df_goster, use_container_width=True, hide_index=True)
 
                 st.markdown("#### 📊 Kategori Özeti")
-                df_kat = run_query_df("""
+                q_kat = """
                     SELECT kategori AS 'Kategori',
                            COUNT(*) AS 'İşlem',
                            SUM(miktar) AS 'Toplam Adet',
                            SUM(tutar) AS 'Toplam Tutar'
                     FROM dukkan_hareket
                     WHERE SUBSTR(tarih,1,10) BETWEEN ? AND ?
+                """
+                p_kat = [rb, re_]
+                if rapor_kat != "Tümü":
+                    q_kat += " AND kategori = ?"
+                    p_kat.append(rapor_kat)
+                q_kat += """
                     GROUP BY kategori
                     ORDER BY SUM(tutar) DESC
-                """, [rb, re_])
+                """
+                df_kat = run_query_df(q_kat, p_kat)
                 if not df_kat.empty:
                     st.dataframe(df_kat, use_container_width=True, hide_index=True)
 
