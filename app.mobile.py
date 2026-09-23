@@ -321,13 +321,19 @@ st.markdown(f"""
        MODERN ANA GİRİŞ EKRANI
        ===================================================== */
     .welcome-shell {{
+        position: relative;
         max-width: 920px;
         margin: 18px auto 22px auto;
         padding: 24px 28px 20px 28px;
         border-radius: 24px;
         background: linear-gradient(135deg, rgba(10,15,25,.96), rgba(31,26,17,.93));
-        border: 1px solid rgba(229,193,88,.35);
-        box-shadow: 0 18px 45px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.06);
+        border: 2px solid transparent;
+        background:
+            linear-gradient(135deg, rgba(10,15,25,.96), rgba(31,26,17,.93)) padding-box,
+            conic-gradient(from 0deg, #ff1744, #ff9100, #ffee00, #00e676, #00b0ff, #7c4dff, #ff00c8, #ff1744) border-box;
+        background-size: 100% 100%, 300% 300%;
+        animation: rgb-border-flow 7s linear infinite;
+        box-shadow: 0 18px 45px rgba(0,0,0,.42), 0 0 22px rgba(0,176,255,.12), inset 0 1px 0 rgba(255,255,255,.06);
         text-align: center;
     }}
     .welcome-brand {{
@@ -377,6 +383,7 @@ st.markdown(f"""
         text-shadow:none !important;
     }}
     .home-card {{
+        position: relative;
         min-height: 170px;
         display:flex;
         gap:16px;
@@ -385,9 +392,14 @@ st.markdown(f"""
         margin-bottom:8px;
         border-radius:20px;
         background: linear-gradient(145deg, rgba(15,23,42,.96), rgba(27,30,38,.94));
-        border:1px solid rgba(255,255,255,.11);
-        box-shadow: 0 12px 30px rgba(0,0,0,.30);
-        transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+        border:2px solid transparent;
+        background:
+            linear-gradient(145deg, rgba(15,23,42,.97), rgba(27,30,38,.95)) padding-box,
+            conic-gradient(from 0deg, #ff1744, #ff9100, #ffee00, #00e676, #00b0ff, #7c4dff, #ff00c8, #ff1744) border-box;
+        background-size: 100% 100%, 280% 280%;
+        animation: rgb-border-flow 9s linear infinite;
+        box-shadow: 0 12px 30px rgba(0,0,0,.30), 0 0 18px rgba(124,77,255,.10);
+        transition: transform .18s ease, box-shadow .18s ease;
     }}
     .home-card:hover {{
         transform: translateY(-2px);
@@ -437,6 +449,16 @@ st.markdown(f"""
         font-size:11px;
         font-weight:700;
     }}
+    @keyframes rgb-border-flow {{
+        0% {{ background-position: 0% 50%, 0% 50%; }}
+        50% {{ background-position: 0% 50%, 100% 50%; }}
+        100% {{ background-position: 0% 50%, 0% 50%; }}
+    }}
+
+    .home-card:hover {{
+        box-shadow: 0 16px 34px rgba(0,0,0,.38), 0 0 26px rgba(0,176,255,.16), 0 0 32px rgba(255,0,200,.10);
+    }}
+
     /* Sadece ana menü kartlarının hemen altındaki butonları modernleştirir. */
     .stButton > button {{
         border-radius:12px !important;
