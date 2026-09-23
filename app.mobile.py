@@ -5,9 +5,6 @@ import libsql_client as libsql
 import base64
 from io import BytesIO
 from html import escape
-import streamlit.components.v1 as components
-from zoneinfo import ZoneInfo
-import zipfile
 
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_RIGHT
@@ -260,60 +257,6 @@ st.markdown(f"""
 
     div[data-testid="stMetricLabel"] {{
         color: #cbd5e1 !important;
-    }}
-
-    /* =====================================================
-       PROFESYONEL KONTROL PANELİ
-       ===================================================== */
-    .hero-panel {{
-        background: linear-gradient(135deg, rgba(10,15,25,.88), rgba(44,32,12,.78));
-        border: 1px solid rgba(229,193,88,.38);
-        border-radius: 22px;
-        padding: 22px 24px;
-        margin: 8px 0 18px 0;
-        box-shadow: 0 18px 50px rgba(0,0,0,.42), inset 0 0 30px rgba(229,193,88,.04);
-        backdrop-filter: blur(12px);
-    }}
-    .hero-title {{
-        font-size: 30px;
-        font-weight: 900;
-        letter-spacing: .5px;
-        margin: 0;
-        color: #f6df9b;
-        text-shadow: 0 0 18px rgba(229,193,88,.22);
-    }}
-    .hero-sub {{
-        color: #d7dce5;
-        margin-top: 5px;
-        font-size: 14px;
-    }}
-    .status-pill {{
-        display: inline-block;
-        padding: 6px 11px;
-        border-radius: 999px;
-        background: rgba(34,197,94,.13);
-        border: 1px solid rgba(34,197,94,.35);
-        color: #86efac;
-        font-weight: 800;
-        font-size: 12px;
-        margin-top: 10px;
-    }}
-    .section-ribbon {{
-        display:flex;
-        align-items:center;
-        gap:10px;
-        margin: 18px 0 10px 0;
-        padding: 10px 14px;
-        border-left: 4px solid #c5a059;
-        background: linear-gradient(90deg, rgba(197,160,89,.15), rgba(197,160,89,.02));
-        border-radius: 10px;
-        font-weight: 900;
-        color:#f3e5ab;
-    }}
-    .mini-note {{
-        color:#b9c0cc;
-        font-size:12px;
-        margin-top:-4px;
     }}
 </style>
 """, unsafe_allow_html=True)
@@ -570,132 +513,6 @@ def build_toptan_pdf(df, firma, bas_tarih, bit_tarih, devir, satis, tahsilat, ba
     return buf.getvalue()
 
 
-# =========================================================
-# CANLI KONTROL PANELİ — SADECE OKUMA / RAPORLAMA
-# Veritabanındaki mevcut kayıtlar değiştirilmez veya silinmez.
-# =========================================================
-def _tr_now():
-    return datetime.now(ZoneInfo("Europe/Istanbul"))
-
-
-def _safe_sum(df, col):
-    if df is None or df.empty or col not in df.columns:
-        return 0.0
-    return float(pd.to_numeric(df[col], errors="coerce").fillna(0).sum())
-
-
-def create_full_backup_zip():
-    tables = {
-        "dukkan_hareket.csv": run_query_df("SELECT * FROM dukkan_hareket ORDER BY id ASC"),
-        "toptan_satis.csv": run_query_df("SELECT * FROM toptan_satis ORDER BY id ASC"),
-        "firmalar.csv": run_query_df("SELECT * FROM firmalar ORDER BY id ASC"),
-    }
-    buf = BytesIO()
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
-        for filename, df in tables.items():
-            z.writestr(filename, df.to_csv(index=False, encoding="utf-8-sig"))
-        z.writestr(
-            "Yedek_Bilgisi.txt",
-            "Midyeci Abla Canlı Takip\n"
-            f"Yedek tarihi: {_tr_now().strftime('%d.%m.%Y %H:%M:%S')}\n"
-            "Bu yedek sadece mevcut kayıtların dışa aktarılmış kopyasıdır.\n"
-        )
-    buf.seek(0)
-    return buf.getvalue()
-
-
-now_tr = _tr_now()
-bugun = now_tr.strftime("%Y-%m-%d")
-aktif_ay = now_tr.strftime("%Y-%m")
-
-# Canlı saat/tarih alanı — tarayıcı içinde saniyede bir güncellenir.
-components.html(
-    """
-    <div style="font-family:Arial,sans-serif; background:linear-gradient(135deg,#111827,#30230f);
-        border:1px solid rgba(229,193,88,.45); border-radius:18px; padding:12px 18px;
-        color:white; text-align:center; box-shadow:0 10px 35px rgba(0,0,0,.35);">
-        <div id="saat" style="font-size:27px;font-weight:900;color:#f6df9b;letter-spacing:1px;"></div>
-        <div id="tarih" style="font-size:13px;color:#d1d5db;margin-top:3px;"></div>
-    </div>
-    <script>
-    function guncelleSaat(){
-        const d=new Date();
-        const saat=d.toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
-        const tarih=d.toLocaleDateString('tr-TR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
-        document.getElementById('saat').innerText='🕒 '+saat;
-        document.getElementById('tarih').innerText='📅 '+tarih;
-    }
-    guncelleSaat(); setInterval(guncelleSaat,1000);
-    </script>
-    """,
-    height=91,
-)
-
-# Üst özet sorguları — mevcut kayıtlar korunur.
-df_d_ay = run_query_df("""
-    SELECT
-        COALESCE(SUM(CASE WHEN islem_tipi='Günlük Satış (Gelir)' THEN tutar ELSE 0 END),0) AS gelir,
-        COALESCE(SUM(CASE WHEN islem_tipi='Dükkan Gideri (Gider)' THEN tutar ELSE 0 END),0) AS gider,
-        COUNT(*) AS hareket
-    FROM dukkan_hareket
-    WHERE SUBSTR(tarih,1,7)=?
-""", [aktif_ay])
-
-df_t_ay = run_query_df("""
-    SELECT
-        COALESCE(SUM(CASE WHEN islem_turu='Satış' THEN toplam_tutar ELSE 0 END),0) AS satis,
-        COALESCE(SUM(CASE WHEN islem_turu='Tahsilat' THEN toplam_tutar ELSE 0 END),0) AS tahsilat,
-        COUNT(*) AS hareket
-    FROM toptan_satis
-    WHERE SUBSTR(tarih,1,7)=?
-""", [aktif_ay])
-
-df_f_say = run_query_df("SELECT COUNT(*) AS adet FROM firmalar")
-
-ay_gelir = _safe_sum(df_d_ay, "gelir")
-ay_gider = _safe_sum(df_d_ay, "gider")
-ay_toptan_satis = _safe_sum(df_t_ay, "satis")
-ay_toptan_tahsilat = _safe_sum(df_t_ay, "tahsilat")
-firma_sayisi = int(df_f_say['adet'].iloc[0]) if not df_f_say.empty else 0
-ay_net = ay_gelir - ay_gider
-
-st.markdown(f"""
-<div class="hero-panel">
-    <div class="hero-title">🦪 MİDYECİ ABLA • YÖNETİM MERKEZİ</div>
-    <div class="hero-sub">Dükkan, toptan satış, cari hesap, firma ve rapor yönetimi tek panelde.</div>
-    <span class="status-pill">● VERİTABANI BAĞLI • {firma_sayisi} FİRMA KAYITLI</span>
-</div>
-""", unsafe_allow_html=True)
-
-st.markdown('<div class="section-ribbon">📊 Canlı İşletme Özeti • Bu Ay</div>', unsafe_allow_html=True)
-
-k1,k2,k3,k4,k5 = st.columns(5)
-k1.metric("🏪 Dükkan Geliri", _money(ay_gelir))
-k2.metric("💸 Dükkan Gideri", _money(ay_gider))
-k3.metric("📈 Dükkan Net", _money(ay_net))
-k4.metric("🚚 Toptan Satış", _money(ay_toptan_satis))
-k5.metric("💵 Toptan Tahsilat", _money(ay_toptan_tahsilat))
-
-qc1, qc2, qc3 = st.columns([1.1, 1.1, 1])
-with qc1:
-    st.markdown(f"**📅 Dönem:** `{now_tr.strftime('%d.%m.%Y')} • {now_tr.strftime('%H:%M:%S')}`")
-with qc2:
-    st.markdown(f"**📚 Bu ay hareket:** `{int(_safe_sum(df_d_ay,'hareket') + _safe_sum(df_t_ay,'hareket')):,}` kayıt")
-with qc3:
-    if st.button("🔄 Paneli Yenile", use_container_width=True, key="dashboard_refresh"):
-        st.rerun()
-
-with st.expander("🛡️ Veri Güvenliği • Mevcut Kayıtları Yedekle", expanded=False):
-    st.caption("Bu işlem veritabanındaki kayıtları silmez veya değiştirmez; sadece CSV arşivi oluşturur.")
-    st.download_button(
-        "📦 3 Tabloyu ZIP Olarak Yedekle",
-        data=create_full_backup_zip(),
-        file_name=f"midyeci_abla_yedek_{now_tr.strftime('%Y%m%d_%H%M%S')}.zip",
-        mime="application/zip",
-        use_container_width=True,
-        key="full_backup_download"
-    )
-
 # Sekmeler (5 Sekmeli Yapı)
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["🏪 Dükkan", "🚚 Toptan", "🏢 Firmalar", "📊 Cari Ekstre", "💰 Borç/Alacak"])
 
@@ -706,7 +523,6 @@ bugun = datetime.now().strftime("%Y-%m-%d")
 # ==========================================
 with tab1:
     st.subheader("🏪 Dükkan Hareketleri & Ekstre")
-    st.caption("Günlük satış, gider, ürün hareketleri, dönem karşılaştırmaları ve profesyonel PDF raporları.")
     
     islem_modu = st.radio("İşlem Seçin:", ["🔴 Yeni Hareket", "📅 Tarihe Göre Bul", "📈 Dükkan Ekstresi", "📊 Aylık Karşılaştırma", "📋 Tüm Kayıtları Yönet", "🗓️ İki Tarih Arası Ciro"], horizontal=True)
 
@@ -869,25 +685,6 @@ with tab1:
             st.markdown('</div>', unsafe_allow_html=True)
         else:
             st.warning("Belirtilen kriterlerde ve tarih aralığında herhangi bir hareket bulunamadı.")
-
-        # Profesyonel PDF — mevcut Dükkan ekstresi kayıtlarından üretilir.
-        if not df_ekstre.empty:
-            gelir_pdf = float(df_ekstre.loc[df_ekstre["islem_tipi"] == "Günlük Satış (Gelir)", "tutar"].sum())
-            gider_pdf = float(df_ekstre.loc[df_ekstre["islem_tipi"] == "Dükkan Gideri (Gider)", "tutar"].sum())
-            net_pdf = gelir_pdf - gider_pdf
-            pdf_dukkan = build_dukkan_pdf(
-                df_ekstre, str_bas, str_bit, secilen_kategori,
-                net_pdf, gelir_pdf, gider_pdf
-            )
-            st.download_button(
-                "📥 Bu Dükkan Ekstresini Profesyonel PDF Olarak İndir",
-                data=pdf_dukkan,
-                file_name=f"dukkan_ekstresi_{str_bas}_{str_bit}.pdf",
-                mime="application/pdf",
-                type="primary",
-                use_container_width=True,
-                key="pdf_dukkan_ekstre_tab1"
-            )
 
     elif islem_modu == "📊 Aylık Karşılaştırma":
         st.subheader("📊 İki Ayın Performans ve Ürün Kıyaslama Raporu")
@@ -1077,7 +874,6 @@ with tab1:
 # 2. SEKME: TOPTAN (DÜZENLİ ALT SEKME YAPISI)
 # ==========================================
 with tab2:
-    st.caption("Toptan satış, tahsilat, firma bazlı işlemler ve kayıt yönetimi.")
     df_firmalar_opt = run_query_df("SELECT firma_adi FROM firmalar ORDER BY firma_adi ASC")
     firma_listesi = df_firmalar_opt["firma_adi"].tolist() if not df_firmalar_opt.empty else []
 
@@ -1283,7 +1079,6 @@ with tab2:
 # ==========================================
 with tab3:
     st.subheader("🏢 Firma Yönetimi")
-    st.caption("Firma kartları, telefon bilgileri, açıklamalar ve cari hesap bağlantısı.")
     st.caption("Toptan satış ve cari hesaplarda kullanılacak firmaları buradan yönetin.")
 
     f_islem = st.radio(
@@ -1585,7 +1380,6 @@ with tab4:
 # ==========================================
 with tab5:
     st.subheader("💰 Tüm Firmaların Borç / Alacak Listesi")
-    st.caption("Firmaların güncel satış, tahsilat ve bakiye durumunu toplu olarak izleyin.")
     st.write("Sistemde kayıtlı bütün firmaların borç ve alacak durumlarını toplu olarak görüntüleyin.")
     
     # BUTON İLE BORÇLU/ALACAKLI LİSTESİ GETİRME
