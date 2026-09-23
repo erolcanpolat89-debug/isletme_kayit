@@ -320,7 +320,7 @@ st.markdown(f"""
     /* =====================================================
        MODERN ANA GİRİŞ EKRANI
        ===================================================== */
-    .welcome-shell {
+    .welcome-shell {{
         max-width: 920px;
         margin: 18px auto 22px auto;
         padding: 24px 28px 20px 28px;
@@ -329,35 +329,35 @@ st.markdown(f"""
         border: 1px solid rgba(229,193,88,.35);
         box-shadow: 0 18px 45px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.06);
         text-align: center;
-    }
-    .welcome-brand {
+    }}
+    .welcome-brand {{
         color: #f6df9b;
         font-size: 18px;
         font-weight: 800;
         letter-spacing: 2px;
-    }
-    .welcome-title {
+    }}
+    .welcome-title {{
         margin-top: 3px;
         color: #ffffff;
         font-size: clamp(24px, 4vw, 34px);
         line-height: 1.15;
         font-weight: 950;
         letter-spacing: .5px;
-    }
-    .welcome-subtitle {
+    }}
+    .welcome-subtitle {{
         margin-top: 10px;
         color: #cbd5e1;
         font-size: 14px;
         font-weight: 600;
-    }
-    .welcome-meta {
+    }}
+    .welcome-meta {{
         display:flex;
         justify-content:center;
         flex-wrap:wrap;
         gap:8px;
         margin-top:15px;
-    }
-    .welcome-meta span {
+    }}
+    .welcome-meta span {{
         padding: 6px 11px;
         border-radius: 999px;
         background: rgba(255,255,255,.07);
@@ -366,8 +366,8 @@ st.markdown(f"""
         font-size:12px;
         font-weight:700 !important;
         text-shadow:none !important;
-    }
-    .home-section-title {
+    }}
+    .home-section-title {{
         max-width: 920px;
         margin: 18px auto 10px auto;
         color:#f6df9b !important;
@@ -375,8 +375,8 @@ st.markdown(f"""
         font-weight:900 !important;
         letter-spacing:1.8px;
         text-shadow:none !important;
-    }
-    .home-card {
+    }}
+    .home-card {{
         min-height: 170px;
         display:flex;
         gap:16px;
@@ -388,13 +388,13 @@ st.markdown(f"""
         border:1px solid rgba(255,255,255,.11);
         box-shadow: 0 12px 30px rgba(0,0,0,.30);
         transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
-    }
-    .home-card:hover {
+    }}
+    .home-card:hover {{
         transform: translateY(-2px);
         border-color: rgba(229,193,88,.48);
         box-shadow: 0 16px 34px rgba(0,0,0,.38);
-    }
-    .home-card-icon {
+    }}
+    .home-card-icon {{
         width:58px;
         height:58px;
         flex:0 0 58px;
@@ -405,54 +405,54 @@ st.markdown(f"""
         background: linear-gradient(145deg, rgba(229,193,88,.22), rgba(255,255,255,.06));
         border:1px solid rgba(229,193,88,.25);
         font-size:30px;
-    }
-    .home-card-body { min-width:0; flex:1; }
-    .home-card-title {
+    }}
+    .home-card-body {{ min-width:0; flex:1; }}
+    .home-card-title {{
         color:#ffffff;
         font-size:19px;
         font-weight:900;
         letter-spacing:.3px;
-    }
-    .home-card-desc {
+    }}
+    .home-card-desc {{
         margin-top:5px;
         min-height:40px;
         color:#cbd5e1;
         font-size:12px;
         line-height:1.5;
         font-weight:600;
-    }
-    .home-card-stat {
+    }}
+    .home-card-stat {{
         display:flex;
         align-items:baseline;
         gap:7px;
         margin-top:12px;
-    }
-    .home-card-stat b {
+    }}
+    .home-card-stat b {{
         color:#f6df9b;
         font-size:17px;
         font-weight:900;
-    }
-    .home-card-stat span {
+    }}
+    .home-card-stat span {{
         color:#94a3b8;
         font-size:11px;
         font-weight:700;
-    }
+    }}
     /* Sadece ana menü kartlarının hemen altındaki butonları modernleştirir. */
-    .stButton > button {
+    .stButton > button {{
         border-radius:12px !important;
         min-height:44px !important;
         font-weight:900 !important;
-    }
-    .home-card + div button {
+    }}
+    .home-card + div button {{
         background: linear-gradient(135deg,#c5a059,#8d6f2d) !important;
         border:1px solid rgba(246,223,155,.65) !important;
         color:#fff !important;
         box-shadow:0 7px 18px rgba(0,0,0,.25) !important;
-    }
-    .home-card + div button:hover {
+    }}
+    .home-card + div button:hover {{
         filter:brightness(1.08);
         transform:translateY(-1px);
-    }
+    }}
 
 </style>
 """, unsafe_allow_html=True)
