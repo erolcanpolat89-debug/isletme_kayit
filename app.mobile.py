@@ -507,7 +507,7 @@ def build_toptan_pdf(df, firma, bas_tarih, bit_tarih, devir, satis, tahsilat, ba
         ("LEFTPADDING", (0,0), (-1,-1), 4), ("RIGHTPADDING", (0,0), (-1,-1), 4),
         ("TOPPADDING", (0,0), (-1,-1), 4), ("BOTTOMPADDING", (0,0), (-1,-1), 4),
     ]))
-    story += [table, Spacer(1, 5*mm), Paragraph("Bakiye hesabı: Satışlar borç ekler, tahsilatlar borcu düşürür.", styles["TRSmall"])]
+    story += [table, Spacer(1, 5*mm), Paragraph("FİRMA EKSTRESİ EROL CANPOLAT TARAFINDAN OLUŞTULMUŞTUR.", styles["TRSmall"])]
     doc.build(story, onFirstPage=_pdf_header, onLaterPages=_pdf_header)
     buf.seek(0)
     return buf.getvalue()
