@@ -1640,10 +1640,10 @@ with tab2:
                         "🔍 Seçilen filtrelere uygun kayıt bulunamadı."
                     )
 
-# ---------------------------------------------------------
-# 3. ALT SEKME: CARİ EKSTRE & PDF RAPORLAR
-# ---------------------------------------------------------
-with alt_sekme3:
+# ==========================================
+# 4. SEKME: CARİ EKSTRE & PDF RAPORLAR
+# ==========================================
+with tab4:
 
     st.subheader("📄 Kurumsal Firma Ekstresi ve PDF Çıktısı")
 
