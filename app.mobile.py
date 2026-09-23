@@ -1,9 +1,19 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 import libsql_client as libsql
 import base64
-from datetime import datetime, timedelta
+from io import BytesIO
+from html import escape
+
+from reportlab.lib import colors
+from reportlab.lib.enums import TA_CENTER, TA_RIGHT
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import mm
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 
 # Sayfa Ayarları
 st.set_page_config(
@@ -314,6 +324,195 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
+# =========================================================
+# PROFESYONEL RAPOR / PDF YARDIMCILARI
+# =========================================================
+def _money(value):
+    try:
+        return f"{float(value or 0):,.2f} TL"
+    except Exception:
+        return "0.00 TL"
+
+
+def _num(value):
+    try:
+        return float(value or 0)
+    except Exception:
+        return 0.0
+
+
+def _register_pdf_fonts():
+    regular = "DejaVuSans.ttf"
+    bold = "DejaVuSans-Bold.ttf"
+    try:
+        if "DejaVu" not in pdfmetrics.getRegisteredFontNames():
+            pdfmetrics.registerFont(TTFont("DejaVu", regular))
+            pdfmetrics.registerFont(TTFont("DejaVu-Bold", bold))
+        return "DejaVu", "DejaVu-Bold"
+    except Exception:
+        return "Helvetica", "Helvetica-Bold"
+
+
+def _pdf_header(canvas, doc):
+    canvas.saveState()
+    canvas.setFont("DejaVu", 8)
+    canvas.setFillColor(colors.HexColor("#666666"))
+    canvas.drawString(18 * mm, 10 * mm, "Midyeci Abla Canlı Takip")
+    canvas.drawRightString(192 * mm, 10 * mm, f"Sayfa {doc.page}")
+    canvas.restoreState()
+
+
+def build_dukkan_pdf(df, bas_tarih, bit_tarih, kategori, net, gelir, gider):
+    regular, bold = _register_pdf_fonts()
+    buf = BytesIO()
+    doc = SimpleDocTemplate(
+        buf, pagesize=A4,
+        rightMargin=12 * mm, leftMargin=12 * mm,
+        topMargin=14 * mm, bottomMargin=16 * mm,
+        title="Midyeci Abla - Dükkan Ekstresi"
+    )
+    styles = getSampleStyleSheet()
+    styles.add(ParagraphStyle(name="TRTitle", fontName=bold, fontSize=17, leading=21, alignment=TA_CENTER, spaceAfter=8))
+    styles.add(ParagraphStyle(name="TRSub", fontName=regular, fontSize=9, leading=12, alignment=TA_CENTER, textColor=colors.HexColor("#555555"), spaceAfter=10))
+    styles.add(ParagraphStyle(name="TRBody", fontName=regular, fontSize=8.5, leading=11))
+    styles.add(ParagraphStyle(name="TRRight", fontName=regular, fontSize=8.5, leading=11, alignment=TA_RIGHT))
+    styles.add(ParagraphStyle(name="TRSmall", fontName=regular, fontSize=7.5, leading=9))
+
+    story = [
+        Paragraph("MİDYECİ ABLA", styles["TRTitle"]),
+        Paragraph("DÜKKAN CARİ EKSTRESİ / GELİR-GİDER RAPORU", styles["TRTitle"]),
+        Paragraph(f"Tarih Aralığı: {bas_tarih} - {bit_tarih} &nbsp;&nbsp; | &nbsp;&nbsp; Kategori: {escape(str(kategori))}", styles["TRSub"]),
+    ]
+
+    summary = [
+        [Paragraph("Toplam Gelir", styles["TRBody"]), Paragraph(_money(gelir), styles["TRRight"]),
+         Paragraph("Toplam Gider", styles["TRBody"]), Paragraph(_money(gider), styles["TRRight"]),
+         Paragraph("Net Sonuç", styles["TRBody"]), Paragraph(_money(net), styles["TRRight"])],
+    ]
+    t = Table(summary, colWidths=[25*mm, 28*mm, 25*mm, 28*mm, 22*mm, 28*mm])
+    t.setStyle(TableStyle([
+        ("BACKGROUND", (0,0), (-1,-1), colors.HexColor("#F4F6F8")),
+        ("BOX", (0,0), (-1,-1), 0.6, colors.HexColor("#C8CDD3")),
+        ("INNERGRID", (0,0), (-1,-1), 0.3, colors.HexColor("#D8DDE2")),
+        ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
+        ("LEFTPADDING", (0,0), (-1,-1), 5), ("RIGHTPADDING", (0,0), (-1,-1), 5),
+        ("TOPPADDING", (0,0), (-1,-1), 6), ("BOTTOMPADDING", (0,0), (-1,-1), 6),
+    ]))
+    story += [t, Spacer(1, 7*mm)]
+
+    rows = [[
+        Paragraph("Tarih", styles["TRSmall"]), Paragraph("İşlem", styles["TRSmall"]),
+        Paragraph("Kategori", styles["TRSmall"]), Paragraph("Ürün / Açıklama", styles["TRSmall"]),
+        Paragraph("Adet", styles["TRSmall"]), Paragraph("Birim", styles["TRSmall"]),
+        Paragraph("Tutar", styles["TRSmall"])
+    ]]
+    for _, r in df.iterrows():
+        islem = str(r.get("islem_tipi", ""))
+        rows.append([
+            Paragraph(escape(str(r.get("tarih", "")))[:16], styles["TRSmall"]),
+            Paragraph(escape(islem), styles["TRSmall"]),
+            Paragraph(escape(str(r.get("kategori", ""))), styles["TRSmall"]),
+            Paragraph(escape(str(r.get("urun_adi", "") or "-")), styles["TRSmall"]),
+            Paragraph(f"{_num(r.get('miktar')):,.0f}", styles["TRSmall"]),
+            Paragraph(_money(r.get("birim_fiyat")), styles["TRSmall"]),
+            Paragraph(_money(r.get("tutar")), styles["TRSmall"]),
+        ])
+
+    table = Table(rows, repeatRows=1, colWidths=[21*mm, 31*mm, 24*mm, 43*mm, 14*mm, 22*mm, 25*mm])
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0,0), (-1,0), colors.HexColor("#20252B")),
+        ("TEXTCOLOR", (0,0), (-1,0), colors.white),
+        ("GRID", (0,0), (-1,-1), 0.3, colors.HexColor("#C9CDD1")),
+        ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
+        ("ALIGN", (4,1), (6,-1), "RIGHT"),
+        ("ROWBACKGROUNDS", (0,1), (-1,-1), [colors.white, colors.HexColor("#F8F9FA")]),
+        ("LEFTPADDING", (0,0), (-1,-1), 4), ("RIGHTPADDING", (0,0), (-1,-1), 4),
+        ("TOPPADDING", (0,0), (-1,-1), 4), ("BOTTOMPADDING", (0,0), (-1,-1), 4),
+    ]))
+    story += [table, Spacer(1, 5*mm), Paragraph("Not: Bu rapor sistemdeki kayıtlar esas alınarak oluşturulmuştur.", styles["TRSmall"])]
+    doc.build(story, onFirstPage=_pdf_header, onLaterPages=_pdf_header)
+    buf.seek(0)
+    return buf.getvalue()
+
+
+def build_toptan_pdf(df, firma, bas_tarih, bit_tarih, devir, satis, tahsilat, bakiye):
+    regular, bold = _register_pdf_fonts()
+    buf = BytesIO()
+    doc = SimpleDocTemplate(
+        buf, pagesize=A4,
+        rightMargin=12 * mm, leftMargin=12 * mm,
+        topMargin=14 * mm, bottomMargin=16 * mm,
+        title=f"{firma} - Cari Ekstre"
+    )
+    styles = getSampleStyleSheet()
+    styles.add(ParagraphStyle(name="TRTitle", fontName=bold, fontSize=17, leading=21, alignment=TA_CENTER, spaceAfter=8))
+    styles.add(ParagraphStyle(name="TRSub", fontName=regular, fontSize=9, leading=12, alignment=TA_CENTER, textColor=colors.HexColor("#555555"), spaceAfter=10))
+    styles.add(ParagraphStyle(name="TRBody", fontName=regular, fontSize=8.5, leading=11))
+    styles.add(ParagraphStyle(name="TRRight", fontName=regular, fontSize=8.5, leading=11, alignment=TA_RIGHT))
+    styles.add(ParagraphStyle(name="TRSmall", fontName=regular, fontSize=7.5, leading=9))
+
+    story = [
+        Paragraph("MİDYECİ ABLA", styles["TRTitle"]),
+        Paragraph("TOPTAN CARİ HESAP EKSTRESİ", styles["TRTitle"]),
+        Paragraph(f"Firma: <b>{escape(str(firma))}</b> &nbsp;&nbsp; | &nbsp;&nbsp; {bas_tarih} - {bit_tarih}", styles["TRSub"]),
+    ]
+    summary = [[
+        Paragraph("Devir", styles["TRBody"]), Paragraph(_money(devir), styles["TRRight"]),
+        Paragraph("Dönem Satış", styles["TRBody"]), Paragraph(_money(satis), styles["TRRight"]),
+        Paragraph("Tahsilat", styles["TRBody"]), Paragraph(_money(tahsilat), styles["TRRight"]),
+        Paragraph("Kapanış", styles["TRBody"]), Paragraph(_money(bakiye), styles["TRRight"]),
+    ]]
+    t = Table(summary, colWidths=[18*mm, 24*mm, 24*mm, 24*mm, 20*mm, 24*mm, 20*mm, 25*mm])
+    t.setStyle(TableStyle([
+        ("BACKGROUND", (0,0), (-1,-1), colors.HexColor("#F4F6F8")),
+        ("BOX", (0,0), (-1,-1), 0.6, colors.HexColor("#C8CDD3")),
+        ("INNERGRID", (0,0), (-1,-1), 0.3, colors.HexColor("#D8DDE2")),
+        ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
+        ("LEFTPADDING", (0,0), (-1,-1), 4), ("RIGHTPADDING", (0,0), (-1,-1), 4),
+        ("TOPPADDING", (0,0), (-1,-1), 6), ("BOTTOMPADDING", (0,0), (-1,-1), 6),
+    ]))
+    story += [t, Spacer(1, 7*mm)]
+
+    rows = [[
+        Paragraph("Tarih", styles["TRSmall"]), Paragraph("İşlem", styles["TRSmall"]),
+        Paragraph("Adet", styles["TRSmall"]), Paragraph("Birim Fiyat", styles["TRSmall"]),
+        Paragraph("Tutar", styles["TRSmall"]), Paragraph("Bakiye", styles["TRSmall"]),
+        Paragraph("Açıklama", styles["TRSmall"])
+    ]]
+    running = _num(devir)
+    for _, r in df.iterrows():
+        tutar = _num(r.get("toplam_tutar"))
+        if str(r.get("islem_turu")) == "Satış":
+            running += tutar
+        else:
+            running -= tutar
+        rows.append([
+            Paragraph(escape(str(r.get("tarih", "")))[:16], styles["TRSmall"]),
+            Paragraph(escape(str(r.get("islem_turu", ""))), styles["TRSmall"]),
+            Paragraph(f"{_num(r.get('adet')):,.0f}", styles["TRSmall"]),
+            Paragraph(_money(r.get("birim_fiyat")), styles["TRSmall"]),
+            Paragraph(_money(tutar), styles["TRSmall"]),
+            Paragraph(_money(running), styles["TRSmall"]),
+            Paragraph(escape(str(r.get("aciklama", "") or "-")), styles["TRSmall"]),
+        ])
+
+    table = Table(rows, repeatRows=1, colWidths=[21*mm, 24*mm, 14*mm, 24*mm, 24*mm, 25*mm, 50*mm])
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0,0), (-1,0), colors.HexColor("#20252B")),
+        ("TEXTCOLOR", (0,0), (-1,0), colors.white),
+        ("GRID", (0,0), (-1,-1), 0.3, colors.HexColor("#C9CDD1")),
+        ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
+        ("ALIGN", (2,1), (5,-1), "RIGHT"),
+        ("ROWBACKGROUNDS", (0,1), (-1,-1), [colors.white, colors.HexColor("#F8F9FA")]),
+        ("LEFTPADDING", (0,0), (-1,-1), 4), ("RIGHTPADDING", (0,0), (-1,-1), 4),
+        ("TOPPADDING", (0,0), (-1,-1), 4), ("BOTTOMPADDING", (0,0), (-1,-1), 4),
+    ]))
+    story += [table, Spacer(1, 5*mm), Paragraph("Bakiye hesabı: Satışlar borç ekler, tahsilatlar borcu düşürür.", styles["TRSmall"])]
+    doc.build(story, onFirstPage=_pdf_header, onLaterPages=_pdf_header)
+    buf.seek(0)
+    return buf.getvalue()
+
+
 # Sekmeler (5 Sekmeli Yapı)
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["🏪 Dükkan", "🚚 Toptan", "🏢 Firmalar", "📊 Cari Ekstre", "💰 Borç/Alacak"])
 
@@ -337,7 +536,7 @@ with tab1:
                 tarih_secim = st.date_input("Tarih", datetime.now(), key="yeni_hareket_tarih")
                 kategori = st.selectbox("Kategori", kategoriler, index=0, key="yeni_hareket_kategori")
             with col2:
-                urun_adi = st.text_input("Ürün / Detay Açıklaması", placeholder="Örn: Açıklama Giriniz.", key="yeni_hareket_urun")
+                urun_adi = st.text_input("Ürün / Detay Açıklaması", placeholder="Örn: Pepsi sarf malzemeleri", key="yeni_hareket_urun")
                 miktar = st.number_input("Miktar / Adet", min_value=1, value=1, step=1, key="yeni_hareket_miktar")
                 
                 son_fiyat_sorgu = run_query_df("SELECT birim_fiyat FROM dukkan_hareket WHERE kategori=? AND birim_fiyat > 0 ORDER BY id DESC LIMIT 1", [kategori])
@@ -675,3811 +874,549 @@ with tab1:
 # 2. SEKME: TOPTAN (DÜZENLİ ALT SEKME YAPISI)
 # ==========================================
 with tab2:
-
-    df_firmalar_opt = run_query_df(
-        "SELECT firma_adi FROM firmalar ORDER BY firma_adi ASC"
-    )
-
-    firma_listesi = (
-        df_firmalar_opt["firma_adi"].tolist()
-        if not df_firmalar_opt.empty
-        else []
-    )
+    df_firmalar_opt = run_query_df("SELECT firma_adi FROM firmalar ORDER BY firma_adi ASC")
+    firma_listesi = df_firmalar_opt["firma_adi"].tolist() if not df_firmalar_opt.empty else []
 
     if not firma_listesi:
-
-        st.warning(
-            "⚠️ Lütfen önce 'Firmalar' sekmesinden bir firma ekleyin!"
-        )
-
+        st.warning("⚠️ Lütfen önce 'Firmalar' sekmesinden bir firma ekleyin!")
     else:
-
-        # =====================================================
-        # TOPTAN ALT SEKMELER
-        # =====================================================
-        alt_sekme1, alt_sekme2, alt_sekme3, alt_sekme4 = st.tabs([
+        # ANA DAĞINIKLIĞI BİTİREN ALT SEKMELER
+        alt_sekme1, alt_sekme2, alt_sekme3 = st.tabs([
             "➕ Yeni İşlem",
             "📅 Tarihe Göre İşlemler",
-            "📄 Cari Ekstre & PDF",
             "⚙️ Tüm Kayıtlar & Yönetim"
         ])
 
-
-        # =====================================================
-        # 1. ALT SEKME: YENİ İŞLEM
-        # =====================================================
+        # ---------------------------------------------------------
+        # 1. ALT SEKME: YENİ İŞLEM (Satış / Tahsilat Girişi)
+        # ---------------------------------------------------------
         with alt_sekme1:
-
             st.subheader("Yeni Toptan İşlem Girişi")
+            islem_turu = st.selectbox("İşlem Tipi", ["Satış (Borç Ekle)", "Tahsilat (Borç Düş/Alacak)"], key="toptan_islem_tipi_select_yeni")
 
-            islem_turu = st.selectbox(
-                "İşlem Tipi",
-                [
-                    "Satış (Borç Ekle)",
-                    "Tahsilat (Borç Düş/Alacak)"
-                ],
-                key="toptan_islem_tipi_select_yeni"
-            )
-
-            secili_firma_toptan = st.selectbox(
-                "Firma Seçin",
-                firma_listesi,
-                key="toptan_firma_secim_yeni"
-            )
-
+            secili_firma_toptan = st.selectbox("Firma Seçin", firma_listesi, key="toptan_firma_secim_yeni")
+            
             if secili_firma_toptan:
-
-                df_f_s = run_query_df(
-                    """
-                    SELECT SUM(toplam_tutar) as t
-                    FROM toptan_satis
-                    WHERE firma_adi=?
-                      AND islem_turu='Satış'
-                    """,
-                    [secili_firma_toptan]
-                )
-
-                df_f_t = run_query_df(
-                    """
-                    SELECT SUM(toplam_tutar) as t
-                    FROM toptan_satis
-                    WHERE firma_adi=?
-                      AND islem_turu='Tahsilat'
-                    """,
-                    [secili_firma_toptan]
-                )
-
-                f_s = (
-                    df_f_s["t"].iloc[0]
-                    if not df_f_s.empty
-                    and pd.notnull(df_f_s["t"].iloc[0])
-                    else 0.0
-                )
-
-                f_t = (
-                    df_f_t["t"].iloc[0]
-                    if not df_f_t.empty
-                    and pd.notnull(df_f_t["t"].iloc[0])
-                    else 0.0
-                )
-
+                df_f_s = run_query_df("SELECT SUM(toplam_tutar) as t FROM toptan_satis WHERE firma_adi=? AND islem_turu='Satış'", [secili_firma_toptan])
+                df_f_t = run_query_df("SELECT SUM(toplam_tutar) as t FROM toptan_satis WHERE firma_adi=? AND islem_turu='Tahsilat'", [secili_firma_toptan])
+                f_s = df_f_s['t'].iloc[0] if not df_f_s.empty and pd.notnull(df_f_s['t'].iloc[0]) else 0.0
+                f_t = df_f_t['t'].iloc[0] if not df_f_t.empty and pd.notnull(df_f_t['t'].iloc[0]) else 0.0
                 f_bakiye = f_s - f_t
-
+                
                 if f_bakiye > 0:
-
-                    st.error(
-                        f"📌 **{secili_firma_toptan}** "
-                        f"Güncel Durumu: "
-                        f"**{f_bakiye:,.2f} TL BORÇLU**"
-                    )
-
+                    st.error(f"📌 **{secili_firma_toptan}** Güncel Durumu: **{f_bakiye:,.2f} TL BORÇLU**")
                 elif f_bakiye < 0:
-
-                    st.success(
-                        f"📌 **{secili_firma_toptan}** "
-                        f"Güncel Durumu: "
-                        f"**{abs(f_bakiye):,.2f} TL ALACAKLI "
-                        f"(Fazla Ödeme)**"
-                    )
-
+                    st.success(f"📌 **{secili_firma_toptan}** Güncel Durumu: **{abs(f_bakiye):,.2f} TL ALACAKLI (Fazla Ödeme)**")
                 else:
+                    st.info(f"📌 **{secili_firma_toptan}** Güncel Durumu: **0.00 TL (Hesap Kapalı / Borcu Yok)**")
 
-                    st.info(
-                        f"📌 **{secili_firma_toptan}** "
-                        f"Güncel Durumu: "
-                        f"**0.00 TL "
-                        f"(Hesap Kapalı / Borcu Yok)**"
-                    )
-
-            with st.form(
-                "toptan_form_duzenli",
-                clear_on_submit=True
-            ):
-
-                tarih = st.date_input(
-                    "İşlem Tarihi",
-                    datetime.now()
-                )
-
+            with st.form("toptan_form_duzenli", clear_on_submit=True):
+                tarih = st.date_input("İşlem Tarihi", datetime.now())
+                
                 if islem_turu == "Satış (Borç Ekle)":
-
-                    adet = st.number_input(
-                        "Satılan Adet",
-                        min_value=1,
-                        step=50,
-                        value=100
-                    )
-
-                    birim_fiyat = st.number_input(
-                        "Birim Fiyat (TL)",
-                        min_value=0.0,
-                        step=0.5,
-                        value=15.0,
-                        format="%.2f"
-                    )
-
+                    adet = st.number_input("Satılan Adet", min_value=1, step=50, value=100)
+                    birim_fiyat = st.number_input("Birim Fiyat (TL)", min_value=0.0, step=0.5, value=15.0, format="%.2f")
                     toplam_tutar = adet * birim_fiyat
-
-                    st.info(
-                        f"Hesaplanan Tutar: "
-                        f"**{toplam_tutar:,.2f} TL**"
-                    )
-
+                    st.info(f"Hesaplanan Tutar: **{toplam_tutar:,.2f} TL**")
                 else:
-
                     adet = 0
                     birim_fiyat = 0.0
+                    toplam_tutar = st.number_input("Tahsil Edilen Tutar (TL)", min_value=0.0, step=50.0, value=2430.0, format="%.2f")
+                    st.success(f"Tahsilat Tutarı: **{toplam_tutar:,.2f} TL**")
 
-                    toplam_tutar = st.number_input(
-                        "Tahsil Edilen Tutar (TL)",
-                        min_value=0.0,
-                        step=50.0,
-                        value=2430.0,
-                        format="%.2f"
-                    )
-
-                    st.success(
-                        f"Tahsilat Tutarı: "
-                        f"**{toplam_tutar:,.2f} TL**"
-                    )
-
-                aciklama = st.text_input(
-                    "Açıklama / Not"
-                )
-
-                kaydet = st.form_submit_button(
-                    "💾 İşlemi Kaydet",
-                    type="primary"
-                )
-
+                aciklama = st.text_input("Açıklama / Not")
+                
+                kaydet = st.form_submit_button("💾 İşlemi Kaydet", type="primary")
                 if kaydet:
-
-                    t_tur = (
-                        "Satış"
-                        if islem_turu == "Satış (Borç Ekle)"
-                        else "Tahsilat"
-                    )
-
-                    client.execute(
-                        """
-                        INSERT INTO toptan_satis
-                        (
-                            firma_adi,
-                            tarih,
-                            islem_turu,
-                            adet,
-                            birim_fiyat,
-                            toplam_tutar,
-                            aciklama
-                        )
+                    t_tur = "Satış" if islem_turu == "Satış (Borç Ekle)" else "Tahsilat"
+                    client.execute("""
+                        INSERT INTO toptan_satis (firma_adi, tarih, islem_turu, adet, birim_fiyat, toplam_tutar, aciklama)
                         VALUES (?, ?, ?, ?, ?, ?, ?)
-                        """,
-                        [
-                            secili_firma_toptan,
-                            tarih.strftime("%Y-%m-%d"),
-                            t_tur,
-                            adet,
-                            birim_fiyat,
-                            toplam_tutar,
-                            aciklama
-                        ]
-                    )
-
-                    st.success(
-                        f"✅ {t_tur} başarıyla kaydedildi!"
-                    )
-
+                    """, [secili_firma_toptan, tarih.strftime("%Y-%m-%d"), t_tur, adet, birim_fiyat, toplam_tutar, aciklama])
+                    st.success(f"{t_tur} başarıyla kaydedildi!")
                     st.rerun()
 
-
-        # =====================================================
-        # 2. ALT SEKME: TARİHE GÖRE İŞLEMLER
-        # =====================================================
+        # ---------------------------------------------------------
+        # 2. ALT SEKME: TARİHE GÖRE İŞLEMLER (Süzme, Düzenleme, Silme)
+        # ---------------------------------------------------------
         with alt_sekme2:
-
-            st.subheader(
-                "📅 Tarih Bazlı Arama ve Günlük Yönetim"
-            )
-
+            st.subheader("📅 Tarih Bazlı Arama ve Günlük Yönetim")
+            
             col_t1, col_t2 = st.columns([1, 1])
-
             with col_t1:
-
-                secilen_tarih = st.date_input(
-                    "Sorgulanacak Tarih Seçin:",
-                    datetime.now(),
-                    key="toptan_tarih_sorgu_temiz"
-                )
-
+                secilen_tarih = st.date_input("Sorgulanacak Tarih Seçin:", datetime.now(), key="toptan_tarih_sorgu_temiz")
             with col_t2:
-
-                islem_filtresi = st.radio(
-                    "İşlem Filtresi",
-                    [
-                        "🔄 Tümü",
-                        "📦 Sadece Satışlar",
-                        "💰 Sadece Tahsilatlar"
-                    ],
-                    key="toptan_islem_filtresi_temiz",
-                    horizontal=True
-                )
-
-            str_tarih = secilen_tarih.strftime(
-                "%Y-%m-%d"
-            )
-
+                islem_filtresi = st.radio("İşlem Filtresi", ["🔄 Tümü", "📦 Sadece Satışlar", "💰 Sadece Tahsilatlar"], key="toptan_islem_filtresi_temiz", horizontal=True)
+                
+            str_tarih = secilen_tarih.strftime("%Y-%m-%d")
+            
             if islem_filtresi == "📦 Sadece Satışlar":
-
-                df_toptan_gun = run_query_df(
-                    """
-                    SELECT
-                        id,
-                        firma_adi,
-                        tarih,
-                        islem_turu,
-                        adet,
-                        birim_fiyat,
-                        toplam_tutar,
-                        aciklama
-                    FROM toptan_satis
-                    WHERE tarih=?
-                      AND islem_turu='Satış'
-                    ORDER BY id DESC
-                    """,
-                    [str_tarih]
-                )
-
+                df_toptan_gun = run_query_df("SELECT id, firma_adi, tarih, islem_turu, adet, birim_fiyat, toplam_tutar, aciklama FROM toptan_satis WHERE tarih=? AND islem_turu='Satış' ORDER BY id DESC", [str_tarih])
             elif islem_filtresi == "💰 Sadece Tahsilatlar":
-
-                df_toptan_gun = run_query_df(
-                    """
-                    SELECT
-                        id,
-                        firma_adi,
-                        tarih,
-                        islem_turu,
-                        adet,
-                        birim_fiyat,
-                        toplam_tutar,
-                        aciklama
-                    FROM toptan_satis
-                    WHERE tarih=?
-                      AND islem_turu='Tahsilat'
-                    ORDER BY id DESC
-                    """,
-                    [str_tarih]
-                )
-
+                df_toptan_gun = run_query_df("SELECT id, firma_adi, tarih, islem_turu, adet, birim_fiyat, toplam_tutar, aciklama FROM toptan_satis WHERE tarih=? AND islem_turu='Tahsilat' ORDER BY id DESC", [str_tarih])
             else:
-
-                df_toptan_gun = run_query_df(
-                    """
-                    SELECT
-                        id,
-                        firma_adi,
-                        tarih,
-                        islem_turu,
-                        adet,
-                        birim_fiyat,
-                        toplam_tutar,
-                        aciklama
-                    FROM toptan_satis
-                    WHERE tarih=?
-                    ORDER BY id DESC
-                    """,
-                    [str_tarih]
-                )
-
+                df_toptan_gun = run_query_df("SELECT id, firma_adi, tarih, islem_turu, adet, birim_fiyat, toplam_tutar, aciklama FROM toptan_satis WHERE tarih=? ORDER BY id DESC", [str_tarih])
+            
             if df_toptan_gun.empty:
-
-                st.warning(
-                    f"🔍 {str_tarih} tarihinde seçilen filtreye "
-                    f"uygun işlem kaydı bulunamadı."
-                )
-
+                st.warning(f"🔍 {str_tarih} tarihinde seçilen filtreye uygun işlem kaydı bulunamadı.")
             else:
-
-                st.success(
-                    f"📌 {str_tarih} Tarihindeki Kayıtlar "
-                    f"({len(df_toptan_gun)} Adet)"
-                )
-
-                st.dataframe(
-                    df_toptan_gun[
-                        [
-                            "firma_adi",
-                            "islem_turu",
-                            "adet",
-                            "toplam_tutar",
-                            "aciklama"
-                        ]
-                    ],
-                    use_container_width=True
-                )
-
-                toplam_adet_gun = df_toptan_gun[
-                    "adet"
-                ].sum()
-
-                toplam_tutar_gun = df_toptan_gun[
-                    "toplam_tutar"
-                ].sum()
-
+                st.success(f"📌 {str_tarih} Tarihindeki Kayıtlar ({len(df_toptan_gun)} Adet)")
+                st.dataframe(df_toptan_gun[['firma_adi', 'islem_turu', 'adet', 'toplam_tutar', 'aciklama']], use_container_width=True)
+                
+                toplam_adet_gun = df_toptan_gun['adet'].sum()
+                toplam_tutar_gun = df_toptan_gun['toplam_tutar'].sum()
+                
                 col_m1, col_m2, col_m3 = st.columns(3)
-
                 with col_m1:
-
-                    st.metric(
-                        "İşlem Adedi",
-                        f"{len(df_toptan_gun)} Adet"
-                    )
-
+                    st.metric("İşlem Adedi", f"{len(df_toptan_gun)} Adet")
                 with col_m2:
-
-                    st.metric(
-                        "Toplam Ürün",
-                        f"{toplam_adet_gun:,} Adet"
-                    )
-
+                    st.metric("Toplam Ürün", f"{toplam_adet_gun:,} Adet")
                 with col_m3:
-
-                    st.metric(
-                        "Toplam Tutar",
-                        f"{toplam_tutar_gun:,.2f} TL"
-                    )
-
+                    st.metric("Toplam Tutar", f"{toplam_tutar_gun:,.2f} TL")
+                
                 st.divider()
-
-                st.write(
-                    "**Seçilen Günkü Kaydı Düzenle / Sil**"
-                )
-
+                st.write("**Seçilen Günkü Kaydı Düzenle / Sil**")
                 secilen_id_gun = st.selectbox(
-                    "İşlem Seçin:",
-                    options=df_toptan_gun["id"],
-                    format_func=lambda x:
-                        f"ID:{x} - "
-                        f"{df_toptan_gun[df_toptan_gun['id'] == x]['firma_adi'].values[0]} "
-                        f"("
-                        f"{df_toptan_gun[df_toptan_gun['id'] == x]['islem_turu'].values[0]} "
-                        f"- "
-                        f"{df_toptan_gun[df_toptan_gun['id'] == x]['toplam_tutar'].values[0]} TL"
-                        f")",
+                    "İşlem Seçin:", 
+                    options=df_toptan_gun["id"], 
+                    format_func=lambda x: f"ID:{x} - {df_toptan_gun[df_toptan_gun['id']==x]['firma_adi'].values[0]} ({df_toptan_gun[df_toptan_gun['id']==x]['islem_turu'].values[0]} - {df_toptan_gun[df_toptan_gun['id']==x]['toplam_tutar'].values[0]} TL)",
                     key="sec_id_gunluk"
                 )
-
-                kayit_gun = df_toptan_gun[
-                    df_toptan_gun["id"] == secilen_id_gun
-                ].iloc[0]
-
-                with st.form(
-                    "toptan_gun_duzenle_form_temiz"
-                ):
-
-                    e_tur = st.selectbox(
-                        "İşlem Türü",
-                        ["Satış", "Tahsilat"],
-                        index=(
-                            0
-                            if kayit_gun["islem_turu"] == "Satış"
-                            else 1
-                        )
-                    )
-
-                    e_firma = st.selectbox(
-                        "Firma Seçin",
-                        firma_listesi,
-                        index=(
-                            firma_listesi.index(
-                                kayit_gun["firma_adi"]
-                            )
-                            if kayit_gun["firma_adi"]
-                            in firma_listesi
-                            else 0
-                        ),
-                        key="efirma_gun"
-                    )
-
-                    e_tarih = st.date_input(
-                        "Tarih",
-                        datetime.strptime(
-                            str(kayit_gun["tarih"]),
-                            "%Y-%m-%d"
-                        ),
-                        key="etarih_gun"
-                    )
-
+                
+                kayit_gun = df_toptan_gun[df_toptan_gun["id"] == secilen_id_gun].iloc[0]
+                
+                with st.form("toptan_gun_duzenle_form_temiz"):
+                    e_tur = st.selectbox("İşlem Türü", ["Satış", "Tahsilat"], index=0 if kayit_gun["islem_turu"] == "Satış" else 1)
+                    e_firma = st.selectbox("Firma Seçin", firma_listesi, index=firma_listesi.index(kayit_gun["firma_adi"]) if kayit_gun["firma_adi"] in firma_listesi else 0, key="efirma_gun")
+                    e_tarih = st.date_input("Tarih", datetime.strptime(str(kayit_gun["tarih"]), "%Y-%m-%d"), key="etarih_gun")
+                    
                     if e_tur == "Satış":
-
-                        e_adet = st.number_input(
-                            "Adet",
-                            min_value=0,
-                            step=50,
-                            value=int(
-                                kayit_gun["adet"]
-                            ),
-                            key="eadet_gun"
-                        )
-
-                        e_birim_fiyat = st.number_input(
-                            "Birim Fiyat (TL)",
-                            min_value=0.0,
-                            step=0.5,
-                            value=float(
-                                kayit_gun["birim_fiyat"]
-                            ),
-                            format="%.2f",
-                            key="ebirim_gun"
-                        )
-
-                        e_toplam = (
-                            e_adet * e_birim_fiyat
-                        )
-
+                        e_adet = st.number_input("Adet", min_value=0, step=50, value=int(kayit_gun["adet"]), key="eadet_gun")
+                        e_birim_fiyat = st.number_input("Birim Fiyat (TL)", min_value=0.0, step=0.5, value=float(kayit_gun["birim_fiyat"]), format="%.2f", key="ebirim_gun")
+                        e_toplam = e_adet * e_birim_fiyat
                     else:
-
                         e_adet = 0
                         e_birim_fiyat = 0.0
+                        e_toplam = st.number_input("Tahsil Edilen Tutar (TL)", min_value=0.0, step=50.0, value=float(kayit_gun["toplam_tutar"]), format="%.2f", key="etahsilat_gun")
 
-                        e_toplam = st.number_input(
-                            "Tahsil Edilen Tutar (TL)",
-                            min_value=0.0,
-                            step=50.0,
-                            value=float(
-                                kayit_gun["toplam_tutar"]
-                            ),
-                            format="%.2f",
-                            key="etahsilat_gun"
-                        )
-
-                    st.info(
-                        f"Güncel Tutar: "
-                        f"**{e_toplam:,.2f} TL**"
-                    )
-
-                    e_aciklama = st.text_input(
-                        "Açıklama",
-                        value=(
-                            str(kayit_gun["aciklama"])
-                            if kayit_gun["aciklama"]
-                            else ""
-                        ),
-                        key="eaciklama_gun"
-                    )
-
-                    guncelle_g = st.form_submit_button(
-                        "✏️ Güncelle",
-                        type="primary"
-                    )
-
-                    sil_g = st.form_submit_button(
-                        "🗑️ Sil"
-                    )
-
+                    st.info(f"Güncel Tutar: **{e_toplam:,.2f} TL**")
+                    e_aciklama = st.text_input("Açıklama", value=str(kayit_gun["aciklama"]) if kayit_gun["aciklama"] else "", key="eaciklama_gun")
+                    
+                    guncelle_g = st.form_submit_button("✏️ Güncelle", type="primary")
+                    sil_g = st.form_submit_button("🗑️ Sil")
+                    
                     if guncelle_g:
-
-                        client.execute(
-                            """
-                            UPDATE toptan_satis
-                            SET
-                                firma_adi=?,
-                                tarih=?,
-                                islem_turu=?,
-                                adet=?,
-                                birim_fiyat=?,
-                                toplam_tutar=?,
-                                aciklama=?
+                        client.execute("""
+                            UPDATE toptan_satis 
+                            SET firma_adi=?, tarih=?, islem_turu=?, adet=?, birim_fiyat=?, toplam_tutar=?, aciklama=? 
                             WHERE id=?
-                            """,
-                            [
-                                e_firma,
-                                e_tarih.strftime(
-                                    "%Y-%m-%d"
-                                ),
-                                e_tur,
-                                e_adet,
-                                e_birim_fiyat,
-                                e_toplam,
-                                e_aciklama,
-                                int(secilen_id_gun)
-                            ]
-                        )
-
-                        st.success(
-                            "✅ Kayıt güncellendi!"
-                        )
-
+                        """, [e_firma, e_tarih.strftime("%Y-%m-%d"), e_tur, e_adet, e_birim_fiyat, e_toplam, e_aciklama, int(secilen_id_gun)])
+                        st.success("Kayıt güncellendi!")
                         st.rerun()
-
+                        
                     if sil_g:
-
-                        client.execute(
-                            "DELETE FROM toptan_satis WHERE id=?",
-                            [int(secilen_id_gun)]
-                        )
-
-                        st.warning(
-                            "🗑️ Kayıt silindi!"
-                        )
-
+                        client.execute("DELETE FROM toptan_satis WHERE id=?", [int(secilen_id_gun)])
+                        st.warning("Kayıt silindi!")
                         st.rerun()
 
-
-        # =====================================================
-        # 3. ALT SEKME: CARİ EKSTRE & PDF
-        # =====================================================
-        #
-        # BURASI SENİN MEVCUT CARİ EKSTRE & PDF KODUNUN YERİ.
-        #
-        # Eğer mevcut kodunda zaten:
-        #
-        # with alt_sekme3:
-        #
-        # diye başlayan Cari Ekstre & PDF bölümü varsa,
-        # ONU BURAYA AYNEN KOY.
-        #
-        # =====================================================
-
-
-        # =====================================================
-        # 4. ALT SEKME: TÜM KAYITLAR & YÖNETİM
-        # =====================================================
-        with alt_sekme4:
-
-            st.subheader(
-                "⚙️ Tüm Toptan Kayıtlar ve Yönetim"
-            )
-
-            # -------------------------------------------------
-            # TÜM KAYITLARI ÇEK
-            # -------------------------------------------------
-            df_tum_kayitlar = run_query_df(
-                """
-                SELECT
-                    id,
-                    firma_adi,
-                    tarih,
-                    islem_turu,
-                    adet,
-                    birim_fiyat,
-                    toplam_tutar,
-                    aciklama
-                FROM toptan_satis
-                ORDER BY tarih DESC, id DESC
-                """
-            )
-
-            if df_tum_kayitlar.empty:
-
-                st.info(
-                    "📭 Henüz hiçbir toptan işlem kaydı bulunmuyor."
+        # ---------------------------------------------------------
+        # 4. ALT SEKME: TÜM KAYITLAR & GENEL YÖNETİM
+        # ---------------------------------------------------------
+        with alt_sekme3:
+            st.subheader("⚙️ Tüm Toptan Kayıtları Arşivi ve Düzenleme")
+            df_toptan_all = run_query_df("SELECT id, firma_adi, tarih, islem_turu, adet, birim_fiyat, toplam_tutar, aciklama FROM toptan_satis ORDER BY id DESC")
+            
+            if not df_toptan_all.empty:
+                secilen_id_tum = st.selectbox(
+                    "Arşivden Kayıt Seçin:", 
+                    options=df_toptan_all["id"], 
+                    format_func=lambda x: f"ID:{x} - {df_toptan_all[df_toptan_all['id']==x]['tarih'].values[0]} - {df_toptan_all[df_toptan_all['id']==x]['firma_adi'].values[0]} ({df_toptan_all[df_toptan_all['id']==x]['toplam_tutar'].values[0]} TL)",
+                    key="sec_id_tum_arsiv"
                 )
-
-            else:
-
-                # -------------------------------------------------
-                # GENEL TOPLAMLAR
-                # -------------------------------------------------
-                toplam_satis = df_tum_kayitlar.loc[
-                    df_tum_kayitlar["islem_turu"] == "Satış",
-                    "toplam_tutar"
-                ].sum()
-
-                toplam_tahsilat = df_tum_kayitlar.loc[
-                    df_tum_kayitlar["islem_turu"] == "Tahsilat",
-                    "toplam_tutar"
-                ].sum()
-
-                toplam_adet = df_tum_kayitlar.loc[
-                    df_tum_kayitlar["islem_turu"] == "Satış",
-                    "adet"
-                ].sum()
-
-                kalan_bakiye = (
-                    toplam_satis - toplam_tahsilat
-                )
-
-                st.success(
-                    f"📌 Toplam {len(df_tum_kayitlar)} adet "
-                    f"toptan işlem kaydı bulundu."
-                )
-
-                col_y1, col_y2, col_y3, col_y4 = st.columns(4)
-
-                with col_y1:
-
-                    st.metric(
-                        "📦 Toplam Satış",
-                        f"{toplam_satis:,.2f} TL"
-                    )
-
-                with col_y2:
-
-                    st.metric(
-                        "💰 Toplam Tahsilat",
-                        f"{toplam_tahsilat:,.2f} TL"
-                    )
-
-                with col_y3:
-
-                    st.metric(
-                        "📦 Toplam Ürün",
-                        f"{toplam_adet:,} Adet"
-                    )
-
-                with col_y4:
-
-                    st.metric(
-                        "💳 Kalan Bakiye",
-                        f"{kalan_bakiye:,.2f} TL"
-                    )
-
-                st.divider()
-
-                # -------------------------------------------------
-                # FİLTRELER
-                # -------------------------------------------------
-                col_f1, col_f2 = st.columns(2)
-
-                with col_f1:
-
-                    yonetim_firma = st.selectbox(
-                        "🏢 Firma Filtresi",
-                        ["Tümü"] + firma_listesi,
-                        key="yonetim_firma_filtresi"
-                    )
-
-                with col_f2:
-
-                    yonetim_islem = st.selectbox(
-                        "🔄 İşlem Türü",
-                        [
-                            "Tümü",
-                            "Satış",
-                            "Tahsilat"
-                        ],
-                        key="yonetim_islem_filtresi"
-                    )
-
-                df_yonetim = df_tum_kayitlar.copy()
-
-                if yonetim_firma != "Tümü":
-
-                    df_yonetim = df_yonetim[
-                        df_yonetim["firma_adi"]
-                        == yonetim_firma
-                    ]
-
-                if yonetim_islem != "Tümü":
-
-                    df_yonetim = df_yonetim[
-                        df_yonetim["islem_turu"]
-                        == yonetim_islem
-                    ]
-
-                st.write(
-                    f"**Gösterilen kayıt:** "
-                    f"{len(df_yonetim)} adet"
-                )
-
-                # -------------------------------------------------
-                # KAYITLAR
-                # -------------------------------------------------
-                if not df_yonetim.empty:
-
-                    st.dataframe(
-                        df_yonetim[
-                            [
-                                "id",
-                                "firma_adi",
-                                "tarih",
-                                "islem_turu",
-                                "adet",
-                                "birim_fiyat",
-                                "toplam_tutar",
-                                "aciklama"
-                            ]
-                        ],
-                        use_container_width=True,
-                        hide_index=True
-                    )
-
-                    st.divider()
-
-                    # -------------------------------------------------
-                    # DÜZENLE / SİL
-                    # -------------------------------------------------
-                    st.subheader(
-                        "✏️ Kayıt Düzenle / Sil"
-                    )
-
-                    secilecek_idler = (
-                        df_yonetim["id"].tolist()
-                    )
-
-                    secilen_id_yonetim = st.selectbox(
-                        "İşlem Seçin:",
-                        secilecek_idler,
-                        format_func=lambda x:
-                            (
-                                f"ID:{x} | "
-                                f"{df_yonetim[df_yonetim['id'] == x]['firma_adi'].iloc[0]} | "
-                                f"{df_yonetim[df_yonetim['id'] == x]['islem_turu'].iloc[0]} | "
-                                f"{float(df_yonetim[df_yonetim['id'] == x]['toplam_tutar'].iloc[0]):,.2f} TL | "
-                                f"{df_yonetim[df_yonetim['id'] == x]['tarih'].iloc[0]}"
-                            ),
-                        key="yonetim_secilen_id"
-                    )
-
-                    secilen_kayit = df_yonetim[
-                        df_yonetim["id"]
-                        == secilen_id_yonetim
-                    ].iloc[0]
-
-                    with st.form(
-                        "toptan_tum_kayit_duzenle_form"
-                    ):
-
-                        e2_firma = st.selectbox(
-                            "Firma",
-                            firma_listesi,
-                            index=(
-                                firma_listesi.index(
-                                    secilen_kayit[
-                                        "firma_adi"
-                                    ]
-                                )
-                                if secilen_kayit[
-                                    "firma_adi"
-                                ] in firma_listesi
-                                else 0
-                            ),
-                            key="yonetim_duzenle_firma"
-                        )
-
-                        e2_tarih = st.date_input(
-                            "Tarih",
-                            datetime.strptime(
-                                str(
-                                    secilen_kayit[
-                                        "tarih"
-                                    ]
-                                ),
-                                "%Y-%m-%d"
-                            ),
-                            key="yonetim_duzenle_tarih"
-                        )
-
-                        e2_tur = st.selectbox(
-                            "İşlem Türü",
-                            [
-                                "Satış",
-                                "Tahsilat"
-                            ],
-                            index=(
-                                0
-                                if secilen_kayit[
-                                    "islem_turu"
-                                ] == "Satış"
-                                else 1
-                            ),
-                            key="yonetim_duzenle_tur"
-                        )
-
-                        if e2_tur == "Satış":
-
-                            e2_adet = st.number_input(
-                                "Adet",
-                                min_value=0,
-                                step=50,
-                                value=int(
-                                    secilen_kayit[
-                                        "adet"
-                                    ]
-                                ),
-                                key="yonetim_duzenle_adet"
-                            )
-
-                            e2_birim = st.number_input(
-                                "Birim Fiyat (TL)",
-                                min_value=0.0,
-                                step=0.5,
-                                value=float(
-                                    secilen_kayit[
-                                        "birim_fiyat"
-                                    ]
-                                ),
-                                format="%.2f",
-                                key="yonetim_duzenle_birim"
-                            )
-
-                            e2_toplam = (
-                                e2_adet * e2_birim
-                            )
-
-                        else:
-
-                            e2_adet = 0
-                            e2_birim = 0.0
-
-                            e2_toplam = st.number_input(
-                                "Tahsil Edilen Tutar (TL)",
-                                min_value=0.0,
-                                step=50.0,
-                                value=float(
-                                    secilen_kayit[
-                                        "toplam_tutar"
-                                    ]
-                                ),
-                                format="%.2f",
-                                key="yonetim_duzenle_tahsilat"
-                            )
-
-                        st.info(
-                            f"💰 Güncel Tutar: "
-                            f"**{e2_toplam:,.2f} TL**"
-                        )
-
-                        e2_aciklama = st.text_input(
-                            "Açıklama / Not",
-                            value=(
-                                str(
-                                    secilen_kayit[
-                                        "aciklama"
-                                    ]
-                                )
-                                if secilen_kayit[
-                                    "aciklama"
-                                ]
-                                else ""
-                            ),
-                            key="yonetim_duzenle_aciklama"
-                        )
-
-                        col_k1, col_k2 = st.columns(2)
-
-                        with col_k1:
-
-                            guncelle_yonetim = (
-                                st.form_submit_button(
-                                    "✏️ KAYDI GÜNCELLE",
-                                    type="primary",
-                                    use_container_width=True
-                                )
-                            )
-
-                        with col_k2:
-
-                            sil_yonetim = (
-                                st.form_submit_button(
-                                    "🗑️ KAYDI SİL",
-                                    use_container_width=True
-                                )
-                            )
-
-                        if guncelle_yonetim:
-
-                            client.execute(
-                                """
-                                UPDATE toptan_satis
-                                SET
-                                    firma_adi=?,
-                                    tarih=?,
-                                    islem_turu=?,
-                                    adet=?,
-                                    birim_fiyat=?,
-                                    toplam_tutar=?,
-                                    aciklama=?
-                                WHERE id=?
-                                """,
-                                [
-                                    e2_firma,
-                                    e2_tarih.strftime(
-                                        "%Y-%m-%d"
-                                    ),
-                                    e2_tur,
-                                    e2_adet,
-                                    e2_birim,
-                                    e2_toplam,
-                                    e2_aciklama,
-                                    int(
-                                        secilen_id_yonetim
-                                    )
-                                ]
-                            )
-
-                            st.success(
-                                "✅ Kayıt başarıyla güncellendi."
-                            )
-
-                            st.rerun()
-
-                        if sil_yonetim:
-
-                            client.execute(
-                                """
-                                DELETE FROM toptan_satis
-                                WHERE id=?
-                                """,
-                                [
-                                    int(
-                                        secilen_id_yonetim
-                                    )
-                                ]
-                            )
-
-                            st.success(
-                                "🗑️ Kayıt başarıyla silindi."
-                            )
-
-                            st.rerun()
-
-                else:
-
-                    st.warning(
-                        "🔍 Seçilen filtrelere uygun kayıt bulunamadı."
-                    )
-
-
+                
+                kayit_tum = df_toptan_all[df_toptan_all["id"] == secilen_id_tum].iloc[0]
+                
+                with st.form("toptan_duzenle_form_arsiv"):
+                    e_tur = st.selectbox("İşlem Türü", ["Satış", "Tahsilat"], index=0 if kayit_tum["islem_turu"] == "Satış" else 1, key="etur_arsiv")
+                    e_firma = st.selectbox("Firma Seçin", firma_listesi, index=firma_listesi.index(kayit_tum["firma_adi"]) if kayit_tum["firma_adi"] in firma_listesi else 0, key="efirma_arsiv")
+                    e_tarih = st.date_input("Tarih", datetime.strptime(str(kayit_tum["tarih"]), "%Y-%m-%d"), key="etarih_arsiv")
+                    
+                    if e_tur == "Satış":
+                        e_adet = st.number_input("Adet", min_value=0, step=50, value=int(kayit_tum["adet"]), key="eadet_arsiv")
+                        e_birim_fiyat = st.number_input("Birim Fiyat (TL)", min_value=0.0, step=0.5, value=float(kayit_tum["birim_fiyat"]), format="%.2f", key="ebirim_arsiv")
+                        e_toplam = e_adet * e_birim_fiyat
+                    else:
+                        e_adet = 0
+                        e_birim_fiyat = 0.0
+                        e_toplam = st.number_input("Tahsil Edilen Tutar (TL)", min_value=0.0, step=50.0, value=float(kayit_tum["toplam_tutar"]), format="%.2f", key="etahsilat_arsiv")
+
+                    st.info(f"Tutar: **{e_toplam:,.2f} TL**")
+                    e_aciklama = st.text_input("Açıklama", value=str(kayit_tum["aciklama"]) if kayit_tum["aciklama"] else "", key="eaciklama_arsiv")
+                    
+                    guncelle_a = st.form_submit_button("✏️ Güncelle", type="primary")
+                    sil_a = st.form_submit_button("🗑️ Sil")
+                    
+                    if guncelle_a:
+                        client.execute("""
+                            UPDATE toptan_satis 
+                            SET firma_adi=?, tarih=?, islem_turu=?, adet=?, birim_fiyat=?, toplam_tutar=?, aciklama=? 
+                            WHERE id=?
+                        """, [e_firma, e_tarih.strftime("%Y-%m-%d"), e_tur, e_adet, e_birim_fiyat, e_toplam, e_aciklama, int(secilen_id_tum)])
+                        st.success("Kayıt güncellendi!")
+                        st.rerun()
+                        
+                    if sil_a:
+                        client.execute("DELETE FROM toptan_satis WHERE id=?", [int(secilen_id_tum)])
+                        st.warning("Kayıt silindi!")
+                        st.rerun()
+
+            st.divider()
+            st.write("**Son 10 İşlem Genel Listesi**")
+            df_toptan_view = run_query_df("SELECT firma_adi as 'Firma', tarih as 'Tarih', islem_turu as 'İşlem', toplam_tutar as 'Tutar' FROM toptan_satis ORDER BY id DESC LIMIT 10")
+            st.dataframe(df_toptan_view, use_container_width=True)
 # ==========================================
 # 3. SEKME: FİRMA YÖNETİMİ
 # ==========================================
 with tab3:
-
     st.subheader("🏢 Firma Yönetimi")
-
-    # =====================================================
-    # FİRMA İŞLEMİ SEÇ
-    # =====================================================
+    st.caption("Toptan satış ve cari hesaplarda kullanılacak firmaları buradan yönetin.")
 
     f_islem = st.radio(
         "İşlem Seçin:",
-        [
-            "Yeni Firma Ekle",
-            "Firma Düzenle / Sil"
-        ],
+        ["➕ Yeni Firma Ekle", "✏️ Firma Düzenle / Sil"],
         horizontal=True,
-        key="firma_yonetim_islem"
+        key="firma_yonetim_modu"
     )
 
-    # =====================================================
-    # YENİ FİRMA EKLE
-    # =====================================================
+    if f_islem == "➕ Yeni Firma Ekle":
+        with st.form("yeni_firma_form_prof", clear_on_submit=True):
+            c1, c2 = st.columns(2)
+            with c1:
+                yeni_f_adi = st.text_input("Firma Ünvanı / Adı *", key="firma_yeni_adi_prof")
+                yeni_f_tel = st.text_input("Telefon No", key="firma_yeni_tel_prof")
+            with c2:
+                yeni_f_not = st.text_area("Açıklama / Not", key="firma_yeni_not_prof", height=95)
 
-    if f_islem == "Yeni Firma Ekle":
-
-        with st.form(
-            "yeni_firma_form",
-            clear_on_submit=True
-        ):
-
-            yeni_f_adi = st.text_input(
-                "Firma Ünvanı / Adı *",
-                key="yeni_firma_adi"
-            )
-
-            yeni_f_tel = st.text_input(
-                "Telefon No",
-                key="yeni_firma_tel"
-            )
-
-            yeni_f_not = st.text_input(
-                "Açıklama / Not",
-                key="yeni_firma_not"
-            )
-
-            f_kaydet = st.form_submit_button(
-                "➕ Firmayı Kaydet",
-                type="primary",
-                use_container_width=True
-            )
+            f_kaydet = st.form_submit_button("➕ Firmayı Kaydet", type="primary", use_container_width=True)
 
             if f_kaydet:
-
                 firma_adi_temiz = yeni_f_adi.strip()
-
                 if not firma_adi_temiz:
-
-                    st.error(
-                        "⚠️ Firma adı boş bırakılamaz."
-                    )
-
+                    st.error("⚠️ Firma adı boş bırakılamaz.")
                 else:
-
                     try:
-
                         client.execute(
-                            """
-                            INSERT INTO firmalar
-                                (
-                                    firma_adi,
-                                    telefon,
-                                    aciklama
-                                )
-                            VALUES (?, ?, ?)
-                            """,
-                            [
-                                firma_adi_temiz,
-                                yeni_f_tel.strip(),
-                                yeni_f_not.strip()
-                            ]
+                            "INSERT INTO firmalar (firma_adi, telefon, aciklama) VALUES (?, ?, ?)",
+                            [firma_adi_temiz, yeni_f_tel.strip(), yeni_f_not.strip()]
                         )
-
-                        st.success(
-                            f"✅ '{firma_adi_temiz}' firması başarıyla eklendi."
-                        )
-
+                        st.success("✅ Firma başarıyla eklendi.")
                         st.rerun()
-
-                    except Exception as firma_hata:
-
-                        st.error(
-                            "❌ Firma eklenemedi."
-                        )
-
-                        st.code(
-                            str(firma_hata)
-                        )
-
-    # =====================================================
-    # FİRMA DÜZENLE / SİL
-    # =====================================================
-
+                    except Exception as e:
+                        st.error("❌ Firma eklenemedi. Aynı isimde firma varsa önce onu kontrol edin.")
+                        st.code(str(e))
     else:
-
-        df_firmalar_all = run_query_df(
-            """
-            SELECT
-                id,
-                firma_adi,
-                telefon,
-                aciklama
-            FROM firmalar
-            ORDER BY firma_adi ASC
-            """
-        )
-
-        if not df_firmalar_all.empty:
-
-            secili_f_id = st.selectbox(
-                "Düzenlenecek Firmayı Seçin:",
-                options=df_firmalar_all["id"].tolist(),
-                format_func=lambda x:
-                    df_firmalar_all.loc[
-                        df_firmalar_all["id"] == x,
-                        "firma_adi"
-                    ].iloc[0],
-                key="firma_duzenle_sec"
-            )
-
-            f_kayit = df_firmalar_all[
-                df_firmalar_all["id"] == secili_f_id
-            ].iloc[0]
-
-            with st.form(
-                "firma_duzenle_form"
-            ):
-
-                e_f_adi = st.text_input(
-                    "Firma Adı",
-                    value=str(
-                        f_kayit["firma_adi"]
-                    ),
-                    key="firma_duzenle_adi"
-                )
-
-                e_f_tel = st.text_input(
-                    "Telefon No",
-                    value=(
-                        str(
-                            f_kayit["telefon"]
-                        )
-                        if pd.notna(
-                            f_kayit["telefon"]
-                        )
-                        else ""
-                    ),
-                    key="firma_duzenle_tel"
-                )
-
-                e_f_not = st.text_input(
-                    "Açıklama",
-                    value=(
-                        str(
-                            f_kayit["aciklama"]
-                        )
-                        if pd.notna(
-                            f_kayit["aciklama"]
-                        )
-                        else ""
-                    ),
-                    key="firma_duzenle_not"
-                )
-
-                fc1, fc2 = st.columns(2)
-
-                with fc1:
-
-                    f_guncelle = (
-                        st.form_submit_button(
-                            "✏️ Güncelle",
-                            type="primary",
-                            use_container_width=True
-                        )
-                    )
-
-                with fc2:
-
-                    f_sil = (
-                        st.form_submit_button(
-                            "🗑️ Firmayı Sil",
-                            use_container_width=True
-                        )
-                    )
-
-                # -----------------------------------------
-                # FİRMA GÜNCELLE
-                # -----------------------------------------
-
-                if f_guncelle:
-
-                    yeni_adi = e_f_adi.strip()
-
-                    if not yeni_adi:
-
-                        st.error(
-                            "⚠️ Firma adı boş bırakılamaz."
-                        )
-
-                    else:
-
-                        try:
-
-                            client.execute(
-                                """
-                                UPDATE firmalar
-                                SET
-                                    firma_adi=?,
-                                    telefon=?,
-                                    aciklama=?
-                                WHERE id=?
-                                """,
-                                [
-                                    yeni_adi,
-                                    e_f_tel.strip(),
-                                    e_f_not.strip(),
-                                    int(secili_f_id)
-                                ]
-                            )
-
-                            st.success(
-                                "✅ Firma başarıyla güncellendi."
-                            )
-
-                            st.rerun()
-
-                        except Exception as firma_guncelle_hata:
-
-                            st.error(
-                                "❌ Firma güncellenemedi."
-                            )
-
-                            st.code(
-                                str(
-                                    firma_guncelle_hata
-                                )
-                            )
-
-                # -----------------------------------------
-                # FİRMA SİL
-                # -----------------------------------------
-
-                if f_sil:
-
-                    try:
-
-                        client.execute(
-                            """
-                            DELETE FROM firmalar
-                            WHERE id=?
-                            """,
-                            [
-                                int(secili_f_id)
-                            ]
-                        )
-
-                        st.success(
-                            "🗑️ Firma başarıyla silindi."
-                        )
-
-                        st.rerun()
-
-                    except Exception as firma_sil_hata:
-
-                        st.error(
-                            "❌ Firma silinemedi."
-                        )
-
-                        st.code(
-                            str(
-                                firma_sil_hata
-                            )
-                        )
-
+        df_firma_yonet = run_query_df("SELECT id, firma_adi, telefon, aciklama FROM firmalar ORDER BY firma_adi ASC")
+        if df_firma_yonet.empty:
+            st.info("📭 Henüz kayıtlı firma bulunmuyor.")
         else:
-
-            st.info(
-                "📭 Kayıtlı firma bulunmuyor."
+            secili_f_id = st.selectbox(
+                "Düzenlenecek firmayı seçin:",
+                df_firma_yonet["id"].tolist(),
+                format_func=lambda x: df_firma_yonet.loc[df_firma_yonet["id"] == x, "firma_adi"].iloc[0],
+                key="firma_duzenle_sec_prof"
             )
+            f_kayit = df_firma_yonet[df_firma_yonet["id"] == secili_f_id].iloc[0]
 
-    # =====================================================
-    # KAYITLI FİRMALAR LİSTESİ
-    # =====================================================
+            with st.form("firma_duzenle_form_prof"):
+                e_adi = st.text_input("Firma Ünvanı / Adı", value=str(f_kayit["firma_adi"] or ""), key="firma_duzenle_adi_prof")
+                e_tel = st.text_input("Telefon", value=str(f_kayit["telefon"] or ""), key="firma_duzenle_tel_prof")
+                e_not = st.text_area("Açıklama / Not", value=str(f_kayit["aciklama"] or ""), key="firma_duzenle_not_prof", height=90)
+                c1, c2 = st.columns(2)
+                with c1:
+                    guncelle = st.form_submit_button("✏️ Güncelle", type="primary", use_container_width=True)
+                with c2:
+                    sil = st.form_submit_button("🗑️ Firmayı Sil", use_container_width=True)
+
+                if guncelle:
+                    yeni_adi = e_adi.strip()
+                    if not yeni_adi:
+                        st.error("⚠️ Firma adı boş bırakılamaz.")
+                    else:
+                        try:
+                            client.execute(
+                                "UPDATE firmalar SET firma_adi=?, telefon=?, aciklama=? WHERE id=?",
+                                [yeni_adi, e_tel.strip(), e_not.strip(), int(secili_f_id)]
+                            )
+                            st.success("✅ Firma güncellendi.")
+                            st.rerun()
+                        except Exception as e:
+                            st.error("❌ Firma güncellenemedi.")
+                            st.code(str(e))
+
+                if sil:
+                    st.warning("Bu firmayı silmek, eski toptan hareketlerini silmez; sadece firma listesinden kaldırır.")
+                    try:
+                        client.execute("DELETE FROM firmalar WHERE id=?", [int(secili_f_id)])
+                        st.success("🗑️ Firma silindi.")
+                        st.rerun()
+                    except Exception as e:
+                        st.error("❌ Firma silinemedi.")
+                        st.code(str(e))
 
     st.divider()
-
-    st.markdown(
-        "### 📋 Kayıtlı Firmalar"
-    )
-
-    df_f_list = run_query_df(
-        """
-        SELECT
-            id AS 'ID',
-            firma_adi AS 'Firma Adı',
-            telefon AS 'Telefon',
-            aciklama AS 'Açıklama'
-        FROM firmalar
-        ORDER BY firma_adi ASC
-        """
-    )
-
+    st.markdown("### 📋 Kayıtlı Firmalar")
+    df_f_list = run_query_df("""
+        SELECT id AS 'ID', firma_adi AS 'Firma Adı', telefon AS 'Telefon', aciklama AS 'Açıklama'
+        FROM firmalar ORDER BY firma_adi ASC
+    """)
     if df_f_list.empty:
-
-        st.info(
-            "Henüz kayıtlı firma bulunmuyor."
-        )
-
+        st.info("Henüz kayıtlı firma bulunmuyor.")
     else:
-
-        st.dataframe(
-            df_f_list,
-            use_container_width=True,
-            hide_index=True
-        )
+        st.dataframe(df_f_list, use_container_width=True, hide_index=True)
 
 
 # ==========================================
-# 4. SEKME: CARİ EKSTRE & PDF RAPORLAR
+# 4. SEKME: PROFESYONEL CARİ EKSTRE / RAPOR MERKEZİ
 # ==========================================
 with tab4:
+    st.subheader("📊 Profesyonel Ekstre & Rapor Merkezi")
+    st.caption("Dükkan gelir-gider raporlarını ve firma bazlı toptan cari ekstrelerini tek merkezden hazırlayın.")
 
-    st.subheader(
-        "📄 Kurumsal Firma Ekstresi ve PDF Çıktısı"
-    )
+    rapor_tab1, rapor_tab2 = st.tabs(["🏪 Dükkan Ekstresi", "🚚 Toptan Cari Ekstresi"])
 
-    # =====================================================
-    # 1. FİRMA / TARİH / EKSTRE TÜRÜ SEÇİMİ
-    # =====================================================
+    # ---------------------------------------------------------
+    # DÜKKAN EKSTRESİ
+    # ---------------------------------------------------------
+    with rapor_tab1:
+        st.markdown("### 🏪 Dükkan Gelir / Gider Ekstresi")
+        c1, c2, c3 = st.columns([1, 1, 1.4])
+        with c1:
+            rapor_bas = st.date_input("Başlangıç", datetime.now() - timedelta(days=30), key="rapor_dukkan_bas")
+        with c2:
+            rapor_bit = st.date_input("Bitiş", datetime.now(), key="rapor_dukkan_bit")
+        with c3:
+            rapor_kat = st.selectbox(
+                "Kategori",
+                ["Tümü", "Midye", "Çiğ Köfte", "İçecek", "Dükkan Gideri", "Personel", "Diğer"],
+                key="rapor_dukkan_kat"
+            )
 
-    col_f1, col_f2, col_f3, col_f4 = st.columns(
-        [2, 1, 1, 1.5]
-    )
-
-    with col_f1:
-
-        secilen_firma = st.selectbox(
-            "Ekstresi Alınacak Firma:",
-            firma_listesi,
-            key="ekstre_firma_sec_temiz"
-        )
-
-    with col_f2:
-
-        bas_tarih = st.date_input(
-            "Başlangıç",
-            datetime.now().replace(day=1),
-            key="toptan_bas_tarih_temiz"
-        )
-
-    with col_f3:
-
-        bit_tarih = st.date_input(
-            "Bitiş",
-            datetime.now(),
-            key="toptan_bit_tarih_temiz"
-        )
-
-    with col_f4:
-
-        ekstre_tipi = st.radio(
-            "Ekstre Türü",
-            [
-                "🔍 Detaylı",
-                "📋 Özet"
-            ],
-            key="toptan_ekstre_tipi_sec_temiz",
-            horizontal=True
-        )
-
-    str_bas_tarih = bas_tarih.strftime(
-        "%Y-%m-%d"
-    )
-
-    str_bit_tarih = bit_tarih.strftime(
-        "%Y-%m-%d"
-    )
-
-    # =====================================================
-    # 2. TARİH KONTROLÜ
-    # =====================================================
-
-    if bas_tarih > bit_tarih:
-
-        st.error(
-            "⚠️ Başlangıç tarihi, bitiş tarihinden büyük olamaz."
-        )
-
-    else:
-
-        # =================================================
-        # 3. SEÇİLEN TARİH ARALIĞINDAKİ HAREKETLER
-        # =================================================
-
-        df_firma_hareket = run_query_df(
-            """
-            SELECT
-                id,
-                tarih,
-                islem_turu,
-                adet,
-                birim_fiyat,
-                toplam_tutar,
-                aciklama
-            FROM toptan_satis
-            WHERE firma_adi = ?
-              AND SUBSTR(tarih, 1, 10) BETWEEN ? AND ?
-            ORDER BY
-                SUBSTR(tarih, 1, 10) ASC,
-                id ASC
-            """,
-            [
-                secilen_firma,
-                str_bas_tarih,
-                str_bit_tarih
-            ]
-        )
-
-        # =================================================
-        # 4. DEVİR BAKİYE VE DEVİR ADET
-        # =================================================
-
-        df_devir = run_query_df(
-            """
-            SELECT
-
-                COALESCE(
-                    SUM(
-                        CASE
-                            WHEN islem_turu = 'Satış'
-                            THEN toplam_tutar
-                            ELSE -toplam_tutar
-                        END
-                    ),
-                    0
-                ) AS devir_bakiye,
-
-                COALESCE(
-                    SUM(
-                        CASE
-                            WHEN islem_turu = 'Satış'
-                            THEN adet
-                            ELSE 0
-                        END
-                    ),
-                    0
-                ) AS devir_adet
-
-            FROM toptan_satis
-
-            WHERE firma_adi = ?
-              AND SUBSTR(tarih, 1, 10) < ?
-            """,
-            [
-                secilen_firma,
-                str_bas_tarih
-            ]
-        )
-
-        if not df_devir.empty:
-
-            try:
-
-                devir_bakiye = float(
-                    df_devir.iloc[0][
-                        "devir_bakiye"
-                    ] or 0
-                )
-
-            except Exception:
-
-                devir_bakiye = 0.0
-
-            try:
-
-                devir_adet = int(
-                    df_devir.iloc[0][
-                        "devir_adet"
-                    ] or 0
-                )
-
-            except Exception:
-
-                devir_adet = 0
-
+        if rapor_bas > rapor_bit:
+            st.error("⚠️ Başlangıç tarihi bitiş tarihinden büyük olamaz.")
         else:
+            rb = rapor_bas.strftime("%Y-%m-%d")
+            re_ = rapor_bit.strftime("%Y-%m-%d")
+            q = """
+                SELECT id, tarih, islem_tipi, kategori, urun_adi, miktar, birim_fiyat, tutar
+                FROM dukkan_hareket
+                WHERE SUBSTR(tarih,1,10) BETWEEN ? AND ?
+            """
+            p = [rb, re_]
+            if rapor_kat != "Tümü":
+                q += " AND kategori = ?"
+                p.append(rapor_kat)
+            q += " ORDER BY SUBSTR(tarih,1,10) ASC, id ASC"
+            df_rduk = run_query_df(q, p)
 
-            devir_bakiye = 0.0
-            devir_adet = 0
-
-        # =================================================
-        # 5. HAREKET VARSA
-        # =================================================
-
-        if not df_firma_hareket.empty:
-
-            df_firma_hareket["adet"] = pd.to_numeric(
-                df_firma_hareket["adet"],
-                errors="coerce"
-            ).fillna(0)
-
-            df_firma_hareket["birim_fiyat"] = pd.to_numeric(
-                df_firma_hareket["birim_fiyat"],
-                errors="coerce"
-            ).fillna(0)
-
-            df_firma_hareket["toplam_tutar"] = pd.to_numeric(
-                df_firma_hareket["toplam_tutar"],
-                errors="coerce"
-            ).fillna(0)
-
-            df_firma_hareket["Borç"] = (
-                df_firma_hareket.apply(
-                    lambda row:
-                        float(row["toplam_tutar"])
-                        if row["islem_turu"] == "Satış"
-                        else 0.0,
-                    axis=1
-                )
-            )
-
-            df_firma_hareket["Tahsilat"] = (
-                df_firma_hareket.apply(
-                    lambda row:
-                        float(row["toplam_tutar"])
-                        if row["islem_turu"] == "Tahsilat"
-                        else 0.0,
-                    axis=1
-                )
-            )
-
-            df_firma_hareket["Net_Hareket"] = (
-                df_firma_hareket["Borç"]
-                - df_firma_hareket["Tahsilat"]
-            )
-
-            satis_adetleri = (
-                df_firma_hareket["adet"].where(
-                    df_firma_hareket["islem_turu"] == "Satış",
-                    0
-                )
-            )
-
-            df_firma_hareket["Kümülatif_Adet"] = (
-                devir_adet
-                + satis_adetleri.cumsum()
-            )
-
-            df_firma_hareket["Kalan_Bakiye"] = (
-                devir_bakiye
-                + df_firma_hareket[
-                    "Net_Hareket"
-                ].cumsum()
-            )
-
-            toplam_satis = float(
-                df_firma_hareket["Borç"].sum()
-            )
-
-            toplam_tahsilat = float(
-                df_firma_hareket["Tahsilat"].sum()
-            )
-
-            donem_adet = int(
-                df_firma_hareket.loc[
-                    df_firma_hareket["islem_turu"] == "Satış",
-                    "adet"
-                ].sum()
-            )
-
-            toplam_adet = (
-                devir_adet
-                + donem_adet
-            )
-
-            bakiye = (
-                devir_bakiye
-                + toplam_satis
-                - toplam_tahsilat
-            )
-
-            # =================================================
-            # 6. EKRAN METRİKLERİ
-            # =================================================
+            gelir = _num(df_rduk.loc[df_rduk["islem_tipi"] == "Günlük Satış (Gelir)", "tutar"].sum()) if not df_rduk.empty else 0.0
+            gider = _num(df_rduk.loc[df_rduk["islem_tipi"] == "Dükkan Gideri (Gider)", "tutar"].sum()) if not df_rduk.empty else 0.0
+            net = gelir - gider
 
             m1, m2, m3, m4 = st.columns(4)
-
-            with m1:
-
-                st.metric(
-                    "Toplam Satış (Borç)",
-                    f"{toplam_satis:,.2f} TL"
-                )
-
-            with m2:
-
-                st.metric(
-                    "Yapılan Tahsilat",
-                    f"{toplam_tahsilat:,.2f} TL"
-                )
-
-            with m3:
-
-                if bakiye > 0:
-
-                    st.metric(
-                        "Kalan Bakiye",
-                        f"{bakiye:,.2f} TL"
-                    )
-
-                elif bakiye < 0:
-
-                    st.metric(
-                        "Alacak Bakiyesi",
-                        f"{abs(bakiye):,.2f} TL"
-                    )
-
-                else:
-
-                    st.metric(
-                        "Kalan Bakiye",
-                        "0.00 TL"
-                    )
-
-            with m4:
-
-                st.metric(
-                    "Toplam Kümülatif Adet",
-                    f"{toplam_adet:,} Adet"
-                )
-
-            # =================================================
-            # 7. DEVİR BİLGİSİ
-            # =================================================
-
-            if devir_bakiye != 0 or devir_adet != 0:
-
-                st.info(
-                    f"📌 Devir Bakiye: "
-                    f"**{devir_bakiye:,.2f} TL** "
-                    f"| Devir Adet: "
-                    f"**{devir_adet:,} Adet**"
-                )
-
-            st.markdown("---")
-
-            # =================================================
-            # 8. EKRANDA GÖSTERİLECEK TABLO
-            # =================================================
-
-            if ekstre_tipi == "🔍 Detaylı":
-
-                df_gosterim = df_firma_hareket[
-                    [
-                        "tarih",
-                        "islem_turu",
-                        "adet",
-                        "Kümülatif_Adet",
-                        "birim_fiyat",
-                        "toplam_tutar",
-                        "Kalan_Bakiye",
-                        "aciklama"
-                    ]
-                ].copy()
-
-                df_gosterim.columns = [
-                    "Tarih",
-                    "İşlem",
-                    "Adet",
-                    "Kümülatif Adet",
-                    "Birim Fiyat",
-                    "Tutar",
-                    "Kalan Bakiye",
-                    "Açıklama"
-                ]
-
-            else:
-
-                df_gosterim = df_firma_hareket[
-                    [
-                        "tarih",
-                        "islem_turu",
-                        "adet",
-                        "Kümülatif_Adet",
-                        "toplam_tutar",
-                        "Kalan_Bakiye",
-                        "aciklama"
-                    ]
-                ].copy()
-
-                df_gosterim.columns = [
-                    "Tarih",
-                    "İşlem",
-                    "Adet",
-                    "Kümülatif Adet",
-                    "Tutar",
-                    "Kalan Bakiye",
-                    "Açıklama"
-                ]
-
-            st.markdown(
-                "### 📋 İşlem Geçmişi"
-            )
-
-            st.dataframe(
-                df_gosterim.iloc[::-1],
-                use_container_width=True,
-                hide_index=True
-            )
-
-            # =================================================
-            # BURADAN SONRASI
-            # =================================================
-            # SENİN MEVCUT CARİ EKSTRE + PDF KODUN
-            # AYNEN DEVAM EDECEK.
-
-    st.subheader("📄 Kurumsal Firma Ekstresi ve PDF Çıktısı")
-
-    # =====================================================
-    # 1. FİRMA / TARİH / EKSTRE TÜRÜ SEÇİMİ
-    # =====================================================
-
-    col_f1, col_f2, col_f3, col_f4 = st.columns([2, 1, 1, 1.5])
-
-    with col_f1:
-        secilen_firma = st.selectbox(
-            "Ekstresi Alınacak Firma:",
-            firma_listesi,
-            key="ekstre_firma_sec_temiz"
-        )
-
-    with col_f2:
-        bas_tarih = st.date_input(
-            "Başlangıç",
-            datetime.now().replace(day=1),
-            key="toptan_bas_tarih_temiz"
-        )
-
-    with col_f3:
-        bit_tarih = st.date_input(
-            "Bitiş",
-            datetime.now(),
-            key="toptan_bit_tarih_temiz"
-        )
-
-    with col_f4:
-        ekstre_tipi = st.radio(
-            "Ekstre Türü",
-            ["🔍 Detaylı", "📋 Özet"],
-            key="toptan_ekstre_tipi_sec_temiz",
-            horizontal=True
-        )
-
-    str_bas_tarih = bas_tarih.strftime("%Y-%m-%d")
-    str_bit_tarih = bit_tarih.strftime("%Y-%m-%d")
-
-    # =====================================================
-    # 2. TARİH KONTROLÜ
-    # =====================================================
-
-    if bas_tarih > bit_tarih:
-
-        st.error(
-            "⚠️ Başlangıç tarihi, bitiş tarihinden büyük olamaz."
-        )
-
-    else:
-
-        # =================================================
-        # 3. SEÇİLEN TARİH ARALIĞINDAKİ HAREKETLER
-        # =================================================
-
-        df_firma_hareket = run_query_df(
-            """
-            SELECT
-                id,
-                tarih,
-                islem_turu,
-                adet,
-                birim_fiyat,
-                toplam_tutar,
-                aciklama
-            FROM toptan_satis
-            WHERE firma_adi = ?
-              AND SUBSTR(tarih, 1, 10) BETWEEN ? AND ?
-            ORDER BY SUBSTR(tarih, 1, 10) ASC, id ASC
-            """,
-            [
-                secilen_firma,
-                str_bas_tarih,
-                str_bit_tarih
-            ]
-        )
-
-        # =================================================
-        # 4. DEVİR BAKİYE VE DEVİR ADET
-        # =================================================
-
-        df_devir = run_query_df(
-            """
-            SELECT
-                COALESCE(
-                    SUM(
-                        CASE
-                            WHEN islem_turu = 'Satış'
-                            THEN toplam_tutar
-                            ELSE -toplam_tutar
-                        END
-                    ),
-                    0
-                ) AS devir_bakiye,
-
-                COALESCE(
-                    SUM(
-                        CASE
-                            WHEN islem_turu = 'Satış'
-                            THEN adet
-                            ELSE 0
-                        END
-                    ),
-                    0
-                ) AS devir_adet
-
-            FROM toptan_satis
-
-            WHERE firma_adi = ?
-              AND SUBSTR(tarih, 1, 10) < ?
-            """,
-            [
-                secilen_firma,
-                str_bas_tarih
-            ]
-        )
-
-        if not df_devir.empty:
-
-            try:
-                devir_bakiye = float(
-                    df_devir.iloc[0]["devir_bakiye"] or 0
-                )
-            except Exception:
-                devir_bakiye = 0.0
-
-            try:
-                devir_adet = int(
-                    df_devir.iloc[0]["devir_adet"] or 0
-                )
-            except Exception:
-                devir_adet = 0
-
-        else:
-
-            devir_bakiye = 0.0
-            devir_adet = 0
-
-        # =================================================
-        # 5. HAREKET VARSA
-        # =================================================
-
-        if not df_firma_hareket.empty:
-
-            # ---------------------------------------------
-            # SAYISAL ALANLARI TEMİZLE
-            # ---------------------------------------------
-
-            df_firma_hareket["adet"] = pd.to_numeric(
-                df_firma_hareket["adet"],
-                errors="coerce"
-            ).fillna(0)
-
-            df_firma_hareket["birim_fiyat"] = pd.to_numeric(
-                df_firma_hareket["birim_fiyat"],
-                errors="coerce"
-            ).fillna(0)
-
-            df_firma_hareket["toplam_tutar"] = pd.to_numeric(
-                df_firma_hareket["toplam_tutar"],
-                errors="coerce"
-            ).fillna(0)
-
-            # ---------------------------------------------
-            # BORÇ
-            # ---------------------------------------------
-
-            df_firma_hareket["Borç"] = df_firma_hareket.apply(
-                lambda row:
-                    float(row["toplam_tutar"])
-                    if row["islem_turu"] == "Satış"
-                    else 0.0,
-                axis=1
-            )
-
-            # ---------------------------------------------
-            # TAHSİLAT
-            # ---------------------------------------------
-
-            df_firma_hareket["Tahsilat"] = df_firma_hareket.apply(
-                lambda row:
-                    float(row["toplam_tutar"])
-                    if row["islem_turu"] == "Tahsilat"
-                    else 0.0,
-                axis=1
-            )
-
-            # ---------------------------------------------
-            # NET HAREKET
-            # ---------------------------------------------
-
-            df_firma_hareket["Net_Hareket"] = (
-                df_firma_hareket["Borç"]
-                - df_firma_hareket["Tahsilat"]
-            )
-
-            # ---------------------------------------------
-            # KÜMÜLATİF ADET
-            # ---------------------------------------------
-
-            satis_adetleri = df_firma_hareket["adet"].where(
-                df_firma_hareket["islem_turu"] == "Satış",
-                0
-            )
-
-            df_firma_hareket["Kümülatif_Adet"] = (
-                devir_adet
-                + satis_adetleri.cumsum()
-            )
-
-            # ---------------------------------------------
-            # KALAN BAKİYE
-            # ---------------------------------------------
-
-            df_firma_hareket["Kalan_Bakiye"] = (
-                devir_bakiye
-                + df_firma_hareket["Net_Hareket"].cumsum()
-            )
-
-            # =================================================
-            # 6. TOPLAM HESAPLAR
-            # =================================================
-
-            toplam_satis = float(
-                df_firma_hareket["Borç"].sum()
-            )
-
-            toplam_tahsilat = float(
-                df_firma_hareket["Tahsilat"].sum()
-            )
-
-            donem_adet = int(
-                df_firma_hareket.loc[
-                    df_firma_hareket["islem_turu"] == "Satış",
-                    "adet"
-                ].sum()
-            )
-
-            toplam_adet = (
-                devir_adet
-                + donem_adet
-            )
-
-            bakiye = (
-                devir_bakiye
-                + toplam_satis
-                - toplam_tahsilat
-            )
-
-            # =================================================
-            # 7. EKRAN METRİKLERİ
-            # =================================================
-
-            m1, m2, m3, m4 = st.columns(4)
-
-            with m1:
-                st.metric(
-                    "Toplam Satış (Borç)",
-                    f"{toplam_satis:,.2f} TL"
-                )
-
-            with m2:
-                st.metric(
-                    "Yapılan Tahsilat",
-                    f"{toplam_tahsilat:,.2f} TL"
-                )
-
-            with m3:
-
-                if bakiye > 0:
-
-                    st.metric(
-                        "Kalan Bakiye",
-                        f"{bakiye:,.2f} TL"
-                    )
-
-                elif bakiye < 0:
-
-                    st.metric(
-                        "Alacak Bakiyesi",
-                        f"{abs(bakiye):,.2f} TL"
-                    )
-
-                else:
-
-                    st.metric(
-                        "Kalan Bakiye",
-                        "0.00 TL"
-                    )
-
-            with m4:
-                st.metric(
-                    "Toplam Kümülatif Adet",
-                    f"{toplam_adet:,} Adet"
-                )
-
-            # =================================================
-            # 8. DEVİR BİLGİSİ
-            # =================================================
-
-            if devir_bakiye != 0 or devir_adet != 0:
-
-                st.info(
-                    f"📌 Devir Bakiye: **{devir_bakiye:,.2f} TL** "
-                    f"| Devir Adet: **{devir_adet:,} Adet**"
-                )
-
-            st.markdown("---")
-
-            # =================================================
-            # 9. EKRANDA GÖSTERİLECEK TABLO
-            # =================================================
-
-            if ekstre_tipi == "🔍 Detaylı":
-
-                df_gosterim = df_firma_hareket[
-                    [
-                        "tarih",
-                        "islem_turu",
-                        "adet",
-                        "Kümülatif_Adet",
-                        "birim_fiyat",
-                        "toplam_tutar",
-                        "Kalan_Bakiye",
-                        "aciklama"
-                    ]
-                ].copy()
-
-                df_gosterim.columns = [
-                    "Tarih",
-                    "İşlem",
-                    "Adet",
-                    "Kümülatif Adet",
-                    "Birim Fiyat",
-                    "Tutar",
-                    "Kalan Bakiye",
-                    "Açıklama"
-                ]
-
-            else:
-
-                df_gosterim = df_firma_hareket[
-                    [
-                        "tarih",
-                        "islem_turu",
-                        "adet",
-                        "Kümülatif_Adet",
-                        "toplam_tutar",
-                        "Kalan_Bakiye",
-                        "aciklama"
-                    ]
-                ].copy()
-
-                df_gosterim.columns = [
-                    "Tarih",
-                    "İşlem",
-                    "Adet",
-                    "Kümülatif Adet",
-                    "Tutar",
-                    "Kalan Bakiye",
-                    "Açıklama"
-                ]
-
-            # =================================================
-            # 10. EKRAN TABLOSU
-            # =================================================
-
-            st.markdown("### 📋 İşlem Geçmişi")
-
-            st.dataframe(
-                df_gosterim.iloc[::-1],
-                use_container_width=True,
-                hide_index=True
-            )
-
-            # =================================================
-            # 11. HTML GÜVENLİĞİ
-            # =================================================
-
-            import html
-            import json
-            import io
-            import os
-
-            import streamlit.components.v1 as components
-
-            firma_html = html.escape(
-                str(secilen_firma)
-            )
-
-            ekstre_tipi_html = html.escape(
-                str(ekstre_tipi)
-            )
-
-            # =================================================
-            # 12. PDF HTML BAŞLANGICI
-            # =================================================
-
-            html_content = f"""
-<!DOCTYPE html>
-<html lang="tr">
-<head>
-
-<meta charset="UTF-8">
-
-<meta name="viewport"
-      content="width=device-width, initial-scale=1.0">
-
-<title>
-MİDYECİ ABLA - CARİ HESAP EKSTRESİ
-</title>
-
-<style>
-
-@page {{
-    size: A4;
-    margin: 12mm;
-}}
-
-* {{
-    box-sizing: border-box;
-}}
-
-body {{
-    font-family:
-        Arial,
-        "DejaVu Sans",
-        sans-serif;
-
-    color: #000;
-    background: #fff;
-    margin: 0;
-    padding: 0;
-}}
-
-.rapor {{
-    width: 100%;
-    max-width: 100%;
-    margin: 0 auto;
-}}
-
-.baslik {{
-    text-align: center;
-    font-size: 22px;
-    font-weight: bold;
-    margin-bottom: 6px;
-}}
-
-.altbaslik {{
-    text-align: center;
-    color: #555;
-    font-size: 12px;
-    margin-bottom: 15px;
-}}
-
-.bilgi {{
-    font-size: 12px;
-    margin-bottom: 5px;
-}}
-
-table {{
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 15px;
-    font-size: 10px;
-}}
-
-th {{
-    background: #eeeeee;
-    font-weight: bold;
-}}
-
-th,
-td {{
-    border: 1px solid #777;
-    padding: 5px;
-    vertical-align: middle;
-}}
-
-.sag {{
-    text-align: right;
-}}
-
-.orta {{
-    text-align: center;
-}}
-
-.bakiye {{
-    font-weight: bold;
-}}
-
-.ozet {{
-    width: 100%;
-    margin-top: 20px;
-    border-top: 2px solid #333;
-    padding-top: 10px;
-}}
-
-.ozet-satir {{
-    margin: 5px 0;
-    font-size: 12px;
-}}
-
-.son-bakiye {{
-    font-size: 16px;
-    font-weight: bold;
-    border-top: 1px solid #999;
-    padding-top: 8px;
-    margin-top: 8px;
-}}
-
-@media print {{
-
-    body {{
-        background: #fff !important;
-    }}
-
-    .rapor {{
-        width: 100%;
-    }}
-
-    table {{
-        page-break-inside: auto;
-    }}
-
-    tr {{
-        page-break-inside: avoid;
-        page-break-after: auto;
-    }}
-
-    thead {{
-        display: table-header-group;
-    }}
-
-}}
-
-</style>
-
-</head>
-
-<body>
-
-<div class="rapor">
-
-    <div class="baslik">
-        MİDYECİ ABLA - CARİ HESAP EKSTRESİ
-    </div>
-
-    <div class="altbaslik">
-        <b>Rapor Türü:</b>
-        {ekstre_tipi_html}
-    </div>
-
-    <hr>
-
-    <div class="bilgi">
-        <b>Firma Adı:</b>
-        {firma_html}
-    </div>
-
-    <div class="bilgi">
-        <b>Tarih Aralığı:</b>
-        {str_bas_tarih} / {str_bit_tarih}
-    </div>
-
-    <div class="bilgi">
-        <b>Devir Bakiye:</b>
-        {devir_bakiye:,.2f} TL
-    </div>
-
-    <table>
-
-        <thead>
-
-            <tr>
-
-                <th>Tarih</th>
-
-                <th>İşlem</th>
-
-                <th>Adet</th>
-
-                <th>Kümülatif Adet</th>
-"""
-
-            # =================================================
-            # 13. PDF SÜTUNLARI
-            # =================================================
-
-            if ekstre_tipi == "🔍 Detaylı":
-
-                html_content += """
-                <th>Birim Fiyat</th>
-"""
-
-            html_content += """
-                <th>Tutar</th>
-
-                <th>Kalan Bakiye</th>
-
-                <th>Açıklama</th>
-
-            </tr>
-
-        </thead>
-
-        <tbody>
-"""
-
-            # =================================================
-            # 14. PDF SATIRLARI
-            # =================================================
-
-            for index, row in df_firma_hareket.iterrows():
-
-                try:
-                    tarih_degeri = str(
-                        row["tarih"]
-                    )[:10]
-                except Exception:
-                    tarih_degeri = "-"
-
-                tarih_html = html.escape(
-                    tarih_degeri
-                )
-
-                islem_html = html.escape(
-                    str(row["islem_turu"])
-                )
-
-                aciklama_html = (
-                    html.escape(
-                        str(row["aciklama"])
-                    )
-                    if pd.notna(row["aciklama"])
-                    else "-"
-                )
-
-                try:
-                    adet = int(
-                        float(row["adet"])
-                    )
-                except Exception:
-                    adet = 0
-
-                try:
-                    kumulatif_adet = int(
-                        float(
-                            row["Kümülatif_Adet"]
-                        )
-                    )
-                except Exception:
-                    kumulatif_adet = 0
-
-                try:
-                    birim_fiyat = float(
-                        row["birim_fiyat"]
-                    )
-                except Exception:
-                    birim_fiyat = 0.0
-
-                try:
-                    tutar = float(
-                        row["toplam_tutar"]
-                    )
-                except Exception:
-                    tutar = 0.0
-
-                try:
-                    kalan_bakiye = float(
-                        row["Kalan_Bakiye"]
-                    )
-                except Exception:
-                    kalan_bakiye = 0.0
-
-                html_content += f"""
-            <tr>
-
-                <td>
-                    {tarih_html}
-                </td>
-
-                <td>
-                    {islem_html}
-                </td>
-
-                <td class="orta">
-                    {adet:,}
-                </td>
-
-                <td class="orta">
-                    {kumulatif_adet:,}
-                </td>
-"""
-
-                if ekstre_tipi == "🔍 Detaylı":
-
-                    html_content += f"""
-                <td class="sag">
-                    {birim_fiyat:,.2f} TL
-                </td>
-"""
-
-                html_content += f"""
-                <td class="sag">
-                    {tutar:,.2f} TL
-                </td>
-
-                <td class="sag bakiye">
-                    {kalan_bakiye:,.2f} TL
-                </td>
-
-                <td>
-                    {aciklama_html}
-                </td>
-
-            </tr>
-"""
-
-            # =================================================
-            # 15. PDF ÖZET
-            # =================================================
-
-            html_content += f"""
-        </tbody>
-
-    </table>
-
-    <div class="ozet">
-
-        <h3>
-            📊 Ekstre Özeti
-        </h3>
-
-        <div class="ozet-satir">
-            <b>Devir Bakiye:</b>
-            {devir_bakiye:,.2f} TL
-        </div>
-
-        <div class="ozet-satir">
-            <b>Dönem Toplam Satış:</b>
-            {toplam_satis:,.2f} TL
-        </div>
-
-        <div class="ozet-satir">
-            <b>Dönem Toplam Tahsilat:</b>
-            {toplam_tahsilat:,.2f} TL
-        </div>
-
-        <div class="ozet-satir">
-            <b>Dönem Satış Adedi:</b>
-            {donem_adet:,} Adet
-        </div>
-
-        <div class="ozet-satir">
-            <b>Kümülatif Toplam Adet:</b>
-            {toplam_adet:,} Adet
-        </div>
-
-        <div class="son-bakiye">
-            Kalan Bakiye:
-            {bakiye:,.2f} TL
-        </div>
-
-    </div>
-
-</div>
-
-</body>
-</html>
-"""
-
-            # =================================================
-            # 16. ÖN İZLEME
-            # =================================================
-
-            st.markdown("---")
-
-            st.markdown(
-                "### 👁️ Ekstre Ön İzleme"
-            )
-
-            onizleme_ac = st.button(
-                "👁️ Ekstreyi Ön İzle",
-                use_container_width=True,
-                key="cari_ekstre_onizleme"
-            )
-
-            if onizleme_ac:
-
-                st.markdown(
-                    """
-                    <div style="
-                        background:#ffffff;
-                        color:#000000;
-                        border:1px solid #cccccc;
-                        border-radius:10px;
-                        padding:10px;
-                        margin-top:10px;
-                    ">
-                    """,
-                    unsafe_allow_html=True
-                )
-
-                components.html(
-                    html_content,
-                    height=900,
-                    scrolling=True
-                )
-
-                st.markdown(
-                    """
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
-
-                st.success(
-                    "✅ Ön izleme hazır. "
-                    "Aşağıdaki butondan PDF'yi direkt indirebilirsin."
-                )
-
-            # =================================================
-            # 17. DOĞRUDAN PDF İNDİRME
-            # =================================================
-
-            st.markdown("---")
-
-            st.markdown(
-                "### 📥 PDF İNDİR"
-            )
-
-            st.info(
-                "📱 Ön izlemede gördüğün aynı firma, tarih aralığı "
-                "ve hareket bilgileri PDF olarak hazırlanır."
-            )
-
-            # =================================================
-            # REPORTLAB İLE PDF OLUŞTUR
-            # =================================================
-
-            try:
-
-                from reportlab.lib import colors
-                from reportlab.lib.pagesizes import A4
-                from reportlab.lib.styles import getSampleStyleSheet
-                from reportlab.lib.enums import TA_CENTER, TA_RIGHT
-                from reportlab.lib.units import mm
-                from reportlab.platypus import (
-                    SimpleDocTemplate,
-                    Paragraph,
-                    Spacer,
-                    Table,
-                    TableStyle,
-                    PageBreak
-                )
-                from reportlab.pdfbase import pdfmetrics
-                from reportlab.pdfbase.ttfonts import TTFont
-
-                               # ---------------------------------------------
-                # TÜRKÇE FONT
-                # ---------------------------------------------
-
-                # Font dosyaları app.mobile.py ile aynı klasörde.
-                # Böylece Streamlit Cloud sistem fontu aramaz.
-
-                font_regular = "DejaVuSans"
-                font_bold = "DejaVuSans-Bold"
-
-                font_normal_yolu = os.path.join(
-                    os.path.dirname(
-                        os.path.abspath(__file__)
-                    ),
-                    "DejaVuSans.ttf"
-                )
-
-                font_bold_yolu = os.path.join(
-                    os.path.dirname(
-                        os.path.abspath(__file__)
-                    ),
-                    "DejaVuSans-Bold.ttf"
-                )
-
-                # ---------------------------------------------
-                # FONT DOSYALARI VAR MI?
-                # ---------------------------------------------
-
-                if not os.path.exists(font_normal_yolu):
-
-                    st.error(
-                        "❌ DejaVuSans.ttf bulunamadı."
-                    )
-
-                    st.code(
-                        font_normal_yolu
-                    )
-
-                    st.stop()
-
-                if not os.path.exists(font_bold_yolu):
-
-                    st.error(
-                        "❌ DejaVuSans-Bold.ttf bulunamadı."
-                    )
-
-                    st.code(
-                        font_bold_yolu
-                    )
-
-                    st.stop()
-
-                # ---------------------------------------------
-                # FONTLARI REPORTLAB'A KAYDET
-                # ---------------------------------------------
-
-                try:
-
-                    pdfmetrics.registerFont(
-                        TTFont(
-                            font_regular,
-                            font_normal_yolu
-                        )
-                    )
-
-                    pdfmetrics.registerFont(
-                        TTFont(
-                            font_bold,
-                            font_bold_yolu
-                        )
-                    )
-
-                except Exception as font_hata:
-
-                    st.error(
-                        "❌ Türkçe PDF fontu yüklenemedi."
-                    )
-
-                    st.code(
-                        str(font_hata)
-                    )
-
-                    st.stop()
-
-                # ---------------------------------------------
-                # PDF BELLEĞİ
-                # ---------------------------------------------
-
-                pdf_buffer = io.BytesIO()
-
-                # ---------------------------------------------
-                # PDF BELGESİ
-                # ---------------------------------------------
-
-                pdf_doc = SimpleDocTemplate(
-                    pdf_buffer,
-                    pagesize=A4,
-                    rightMargin=10 * mm,
-                    leftMargin=10 * mm,
-                    topMargin=10 * mm,
-                    bottomMargin=10 * mm,
-                    title="Midyeci Abla Cari Hesap Ekstresi",
-                    author="Midyeci Abla"
-                )
-
-                styles = getSampleStyleSheet()
-
-                baslik_stil = styles["Title"].clone(
-                    "BaslikStil"
-                )
-
-                baslik_stil.fontName = font_bold
-                baslik_stil.fontSize = 16
-                baslik_stil.leading = 19
-                baslik_stil.alignment = TA_CENTER
-                baslik_stil.spaceAfter = 5
-
-                altbaslik_stil = styles["Normal"].clone(
-                    "AltBaslikStil"
-                )
-
-                altbaslik_stil.fontName = font_regular
-                altbaslik_stil.fontSize = 9
-                altbaslik_stil.leading = 11
-                altbaslik_stil.alignment = TA_CENTER
-                altbaslik_stil.spaceAfter = 10
-
-                bilgi_stil = styles["Normal"].clone(
-                    "BilgiStil"
-                )
-
-                bilgi_stil.fontName = font_regular
-                bilgi_stil.fontSize = 9
-                bilgi_stil.leading = 12
-
-                hucre_stil = styles["Normal"].clone(
-                    "HucreStil"
-                )
-
-                hucre_stil.fontName = font_regular
-                hucre_stil.fontSize = 7
-                hucre_stil.leading = 9
-
-                hucre_bold_stil = styles["Normal"].clone(
-                    "HucreBoldStil"
-                )
-
-                hucre_bold_stil.fontName = font_bold
-                hucre_bold_stil.fontSize = 7
-                hucre_bold_stil.leading = 9
-
-                # ---------------------------------------------
-                # PDF İÇERİĞİ
-                # ---------------------------------------------
-
-                pdf_elements = []
-
-                pdf_elements.append(
-                    Paragraph(
-                        "MİDYECİ ABLA - CARİ HESAP EKSTRESİ",
-                        baslik_stil
-                    )
-                )
-
-                pdf_elements.append(
-                    Paragraph(
-                        f"<b>Rapor Türü:</b> "
-                        f"{html.escape(str(ekstre_tipi))}",
-                        altbaslik_stil
-                    )
-                )
-
-                pdf_elements.append(
-                    Paragraph(
-                        f"<b>Firma Adı:</b> "
-                        f"{firma_html}",
-                        bilgi_stil
-                    )
-                )
-
-                pdf_elements.append(
-                    Paragraph(
-                        f"<b>Tarih Aralığı:</b> "
-                        f"{str_bas_tarih} / {str_bit_tarih}",
-                        bilgi_stil
-                    )
-                )
-
-                pdf_elements.append(
-                    Paragraph(
-                        f"<b>Devir Bakiye:</b> "
-                        f"{devir_bakiye:,.2f} TL",
-                        bilgi_stil
-                    )
-                )
-
-                pdf_elements.append(
-                    Spacer(1, 8)
-                )
-
-                # ---------------------------------------------
-                # PDF TABLO BAŞLIĞI
-                # ---------------------------------------------
-
-                if ekstre_tipi == "🔍 Detaylı":
-
-                    pdf_data = [[
-                        Paragraph("Tarih", hucre_bold_stil),
-                        Paragraph("İşlem", hucre_bold_stil),
-                        Paragraph("Adet", hucre_bold_stil),
-                        Paragraph("Kümülatif Adet", hucre_bold_stil),
-                        Paragraph("Birim Fiyat", hucre_bold_stil),
-                        Paragraph("Tutar", hucre_bold_stil),
-                        Paragraph("Kalan Bakiye", hucre_bold_stil),
-                        Paragraph("Açıklama", hucre_bold_stil)
-                    ]]
-
-                else:
-
-                    pdf_data = [[
-                        Paragraph("Tarih", hucre_bold_stil),
-                        Paragraph("İşlem", hucre_bold_stil),
-                        Paragraph("Adet", hucre_bold_stil),
-                        Paragraph("Kümülatif Adet", hucre_bold_stil),
-                        Paragraph("Tutar", hucre_bold_stil),
-                        Paragraph("Kalan Bakiye", hucre_bold_stil),
-                        Paragraph("Açıklama", hucre_bold_stil)
-                    ]]
-
-                # ---------------------------------------------
-                # PDF TABLO SATIRLARI
-                # ---------------------------------------------
-
-                for index, row in df_firma_hareket.iterrows():
-
-                    try:
-                        tarih_pdf = str(
-                            row["tarih"]
-                        )[:10]
-                    except Exception:
-                        tarih_pdf = "-"
-
-                    try:
-                        islem_pdf = html.escape(
-                            str(row["islem_turu"])
-                        )
-                    except Exception:
-                        islem_pdf = "-"
-
-                    try:
-                        adet_pdf = int(
-                            float(row["adet"])
-                        )
-                    except Exception:
-                        adet_pdf = 0
-
-                    try:
-                        kumulatif_pdf = int(
-                            float(
-                                row["Kümülatif_Adet"]
-                            )
-                        )
-                    except Exception:
-                        kumulatif_pdf = 0
-
-                    try:
-                        birim_pdf = float(
-                            row["birim_fiyat"]
-                        )
-                    except Exception:
-                        birim_pdf = 0.0
-
-                    try:
-                        tutar_pdf = float(
-                            row["toplam_tutar"]
-                        )
-                    except Exception:
-                        tutar_pdf = 0.0
-
-                    try:
-                        bakiye_pdf = float(
-                            row["Kalan_Bakiye"]
-                        )
-                    except Exception:
-                        bakiye_pdf = 0.0
-
-                    if (
-                        pd.isna(row["aciklama"])
-                        or str(row["aciklama"]).strip() == ""
-                    ):
-
-                        aciklama_pdf = "-"
-
-                    else:
-
-                        aciklama_pdf = html.escape(
-                            str(row["aciklama"])
-                        )
-
-                    if ekstre_tipi == "🔍 Detaylı":
-
-                        pdf_data.append([
-                            Paragraph(
-                                tarih_pdf,
-                                hucre_stil
-                            ),
-                            Paragraph(
-                                islem_pdf,
-                                hucre_stil
-                            ),
-                            Paragraph(
-                                f"{adet_pdf:,}",
-                                hucre_stil
-                            ),
-                            Paragraph(
-                                f"{kumulatif_pdf:,}",
-                                hucre_stil
-                            ),
-                            Paragraph(
-                                f"{birim_pdf:,.2f} TL",
-                                hucre_stil
-                            ),
-                            Paragraph(
-                                f"{tutar_pdf:,.2f} TL",
-                                hucre_stil
-                            ),
-                            Paragraph(
-                                f"{bakiye_pdf:,.2f} TL",
-                                hucre_stil
-                            ),
-                            Paragraph(
-                                aciklama_pdf,
-                                hucre_stil
-                            )
-                        ])
-
-                    else:
-
-                        pdf_data.append([
-                            Paragraph(
-                                tarih_pdf,
-                                hucre_stil
-                            ),
-                            Paragraph(
-                                islem_pdf,
-                                hucre_stil
-                            ),
-                            Paragraph(
-                                f"{adet_pdf:,}",
-                                hucre_stil
-                            ),
-                            Paragraph(
-                                f"{kumulatif_pdf:,}",
-                                hucre_stil
-                            ),
-                            Paragraph(
-                                f"{tutar_pdf:,.2f} TL",
-                                hucre_stil
-                            ),
-                            Paragraph(
-                                f"{bakiye_pdf:,.2f} TL",
-                                hucre_stil
-                            ),
-                            Paragraph(
-                                aciklama_pdf,
-                                hucre_stil
-                            )
-                        ])
-
-                # ---------------------------------------------
-                # TABLO GENİŞLİĞİ
-                # ---------------------------------------------
-
-                if ekstre_tipi == "🔍 Detaylı":
-
-                    kolon_genislikleri = [
-                        22 * mm,
-                        20 * mm,
-                        13 * mm,
-                        22 * mm,
-                        24 * mm,
-                        24 * mm,
-                        25 * mm,
-                        35 * mm
-                    ]
-
-                else:
-
-                    kolon_genislikleri = [
-                        24 * mm,
-                        22 * mm,
-                        15 * mm,
-                        24 * mm,
-                        27 * mm,
-                        28 * mm,
-                        45 * mm
-                    ]
-
-                pdf_tablo = Table(
-                    pdf_data,
-                    colWidths=kolon_genislikleri,
-                    repeatRows=1,
-                    splitByRow=1
-                )
-
-                pdf_tablo.setStyle(
-                    TableStyle([
-                        (
-                            "BACKGROUND",
-                            (0, 0),
-                            (-1, 0),
-                            colors.HexColor("#eeeeee")
-                        ),
-                        (
-                            "TEXTCOLOR",
-                            (0, 0),
-                            (-1, 0),
-                            colors.black
-                        ),
-                        (
-                            "FONTNAME",
-                            (0, 0),
-                            (-1, 0),
-                            font_bold
-                        ),
-                        (
-                            "FONTNAME",
-                            (0, 1),
-                            (-1, -1),
-                            font_regular
-                        ),
-                        (
-                            "GRID",
-                            (0, 0),
-                            (-1, -1),
-                            0.5,
-                            colors.HexColor("#777777")
-                        ),
-                        (
-                            "VALIGN",
-                            (0, 0),
-                            (-1, -1),
-                            "MIDDLE"
-                        ),
-                        (
-                            "ALIGN",
-                            (2, 1),
-                            (3, -1),
-                            "CENTER"
-                        ),
-                        (
-                            "ALIGN",
-                            (4, 1),
-                            (-2, -1),
-                            "RIGHT"
-                        ),
-                        (
-                            "LEFTPADDING",
-                            (0, 0),
-                            (-1, -1),
-                            3
-                        ),
-                        (
-                            "RIGHTPADDING",
-                            (0, 0),
-                            (-1, -1),
-                            3
-                        ),
-                        (
-                            "TOPPADDING",
-                            (0, 0),
-                            (-1, -1),
-                            3
-                        ),
-                        (
-                            "BOTTOMPADDING",
-                            (0, 0),
-                            (-1, -1),
-                            3
-                        )
-                    ])
-                )
-
-                pdf_elements.append(
-                    pdf_tablo
-                )
-
-                # ---------------------------------------------
-                # PDF ÖZET
-                # ---------------------------------------------
-
-                pdf_elements.append(
-                    Spacer(1, 12)
-                )
-
-                pdf_elements.append(
-                    Paragraph(
-                        "Ekstre Özeti",
-                        hucre_bold_stil
-                    )
-                )
-
-                pdf_elements.append(
-                    Spacer(1, 4)
-                )
-
-                ozet_data = [
-                    [
-                        Paragraph(
-                            "Devir Bakiye",
-                            hucre_bold_stil
-                        ),
-                        Paragraph(
-                            f"{devir_bakiye:,.2f} TL",
-                            hucre_stil
-                        )
-                    ],
-                    [
-                        Paragraph(
-                            "Dönem Toplam Satış",
-                            hucre_bold_stil
-                        ),
-                        Paragraph(
-                            f"{toplam_satis:,.2f} TL",
-                            hucre_stil
-                        )
-                    ],
-                    [
-                        Paragraph(
-                            "Dönem Toplam Tahsilat",
-                            hucre_bold_stil
-                        ),
-                        Paragraph(
-                            f"{toplam_tahsilat:,.2f} TL",
-                            hucre_stil
-                        )
-                    ],
-                    [
-                        Paragraph(
-                            "Dönem Satış Adedi",
-                            hucre_bold_stil
-                        ),
-                        Paragraph(
-                            f"{donem_adet:,} Adet",
-                            hucre_stil
-                        )
-                    ],
-                    [
-                        Paragraph(
-                            "Kümülatif Toplam Adet",
-                            hucre_bold_stil
-                        ),
-                        Paragraph(
-                            f"{toplam_adet:,} Adet",
-                            hucre_stil
-                        )
-                    ],
-                    [
-                        Paragraph(
-                            "Kalan Bakiye",
-                            hucre_bold_stil
-                        ),
-                        Paragraph(
-                            f"{bakiye:,.2f} TL",
-                            hucre_bold_stil
-                        )
-                    ]
-                ]
-
-                ozet_tablo = Table(
-                    ozet_data,
-                    colWidths=[
-                        70 * mm,
-                        50 * mm
-                    ]
-                )
-
-                ozet_tablo.setStyle(
-                    TableStyle([
-                        (
-                            "GRID",
-                            (0, 0),
-                            (-1, -1),
-                            0.5,
-                            colors.HexColor("#999999")
-                        ),
-                        (
-                            "VALIGN",
-                            (0, 0),
-                            (-1, -1),
-                            "MIDDLE"
-                        ),
-                        (
-                            "BACKGROUND",
-                            (0, 0),
-                            (0, -1),
-                            colors.HexColor("#eeeeee")
-                        ),
-                        (
-                            "ALIGN",
-                            (1, 0),
-                            (1, -1),
-                            "RIGHT"
-                        ),
-                        (
-                            "LEFTPADDING",
-                            (0, 0),
-                            (-1, -1),
-                            5
-                        ),
-                        (
-                            "RIGHTPADDING",
-                            (0, 0),
-                            (-1, -1),
-                            5
-                        ),
-                        (
-                            "TOPPADDING",
-                            (0, 0),
-                            (-1, -1),
-                            5
-                        ),
-                        (
-                            "BOTTOMPADDING",
-                            (0, 0),
-                            (-1, -1),
-                            5
-                        )
-                    ])
-                )
-
-                pdf_elements.append(
-                    ozet_tablo
-                )
-
-                # ---------------------------------------------
-                # PDF OLUŞTUR
-                # ---------------------------------------------
-
-                pdf_doc.build(
-                    pdf_elements
-                )
-
-                pdf_bytes = pdf_buffer.getvalue()
-
-                pdf_buffer.close()
-
-                # ---------------------------------------------
-                # DOSYA ADI
-                # ---------------------------------------------
-
-                temiz_firma_adi = "".join(
-                    c
-                    for c in str(secilen_firma)
-                    if c.isalnum()
-                    or c in (
-                        " ",
-                        "_",
-                        "-"
-                    )
-                ).strip()
-
-                if not temiz_firma_adi:
-                    temiz_firma_adi = "Firma"
-
-                pdf_dosya_adi = (
-                    f"cari_ekstre_"
-                    f"{temiz_firma_adi}_"
-                    f"{str_bas_tarih}_"
-                    f"{str_bit_tarih}.pdf"
-                )
-
-                # ---------------------------------------------
-                # DOĞRUDAN PDF İNDİR
-                # ---------------------------------------------
-
+            m1.metric("💵 Gelir", _money(gelir))
+            m2.metric("💸 Gider", _money(gider))
+            m3.metric("📈 Net", _money(net))
+            m4.metric("🧾 İşlem", f"{len(df_rduk):,}")
+
+            if not df_rduk.empty:
+                st.markdown("#### 📅 Günlük Özet")
+                df_gun = run_query_df("""
+                    SELECT SUBSTR(tarih,1,10) AS 'Tarih',
+                           SUM(CASE WHEN islem_tipi='Günlük Satış (Gelir)' THEN tutar ELSE 0 END) AS 'Gelir',
+                           SUM(CASE WHEN islem_tipi='Dükkan Gideri (Gider)' THEN tutar ELSE 0 END) AS 'Gider'
+                    FROM dukkan_hareket
+                    WHERE SUBSTR(tarih,1,10) BETWEEN ? AND ?
+                    GROUP BY SUBSTR(tarih,1,10)
+                    ORDER BY SUBSTR(tarih,1,10) ASC
+                """, [rb, re_])
+                if not df_gun.empty:
+                    df_gun["Net"] = df_gun["Gelir"].fillna(0) - df_gun["Gider"].fillna(0)
+                    for col in ["Gelir", "Gider", "Net"]:
+                        df_gun[col] = df_gun[col].map(lambda x: f"{_num(x):,.2f} TL")
+                    st.dataframe(df_gun, use_container_width=True, hide_index=True)
+
+                st.markdown("#### 📄 Hareket Dökümü")
+                df_goster = df_rduk.copy()
+                df_goster.columns = ["ID", "Tarih", "İşlem", "Kategori", "Ürün / Açıklama", "Adet", "Birim Fiyat", "Tutar"]
+                st.dataframe(df_goster, use_container_width=True, hide_index=True)
+
+                st.markdown("#### 📊 Kategori Özeti")
+                df_kat = run_query_df("""
+                    SELECT kategori AS 'Kategori',
+                           COUNT(*) AS 'İşlem',
+                           SUM(miktar) AS 'Toplam Adet',
+                           SUM(tutar) AS 'Toplam Tutar'
+                    FROM dukkan_hareket
+                    WHERE SUBSTR(tarih,1,10) BETWEEN ? AND ?
+                    GROUP BY kategori
+                    ORDER BY SUM(tutar) DESC
+                """, [rb, re_])
+                if not df_kat.empty:
+                    st.dataframe(df_kat, use_container_width=True, hide_index=True)
+
+                pdf_bytes = build_dukkan_pdf(df_rduk, rb, re_, rapor_kat, net, gelir, gider)
                 st.download_button(
-                    label="📥 PDF'Yİ DİREKT İNDİR",
+                    "📥 Dükkan Ekstresini PDF İndir",
                     data=pdf_bytes,
-                    file_name=pdf_dosya_adi,
+                    file_name=f"dukkan_ekstre_{rb}_{re_}.pdf",
                     mime="application/pdf",
+                    type="primary",
                     use_container_width=True,
-                    key="cari_ekstre_pdf_indir"
+                    key="pdf_dukkan_prof"
                 )
-
-                st.caption(
-                    "✅ Bu buton yazdırma ekranı açmaz. "
-                    "PDF dosyasını doğrudan indirir."
-                )
-
-            except ImportError:
-
-                st.error(
-                    "❌ PDF modülü bulunamadı. "
-                    "Lütfen requirements.txt dosyana "
-                    "'reportlab' satırını ekle."
-                )
-
-            except Exception as pdf_hata:
-
-                st.error(
-                    "❌ PDF oluşturulurken hata oluştu."
-                )
-
-                st.code(
-                    str(pdf_hata)
-                )
-
-               # =====================================================
-        # 18. HAREKET YOKSA
-        # =====================================================
-
-        else:
-
-            if devir_bakiye != 0 or devir_adet != 0:
-
-                st.info(
-                    f"📌 Bu tarih aralığında yeni hareket yok. "
-                    f"Devir Bakiye: **{devir_bakiye:,.2f} TL** "
-                    f"| Devir Adet: **{devir_adet:,} Adet**"
-                )
-
             else:
+                st.info("🔍 Seçilen tarih ve kategori kriterlerinde kayıt bulunamadı.")
 
-                st.warning(
-                    f"🔍 {secilen_firma} firmasına ait "
-                    f"bu tarih aralığında hareket bulunamadı."
-                )
+    # ---------------------------------------------------------
+    # TOPTAN CARİ EKSTRESİ
+    # ---------------------------------------------------------
+    with rapor_tab2:
+        st.markdown("### 🚚 Firma Bazlı Toptan Cari Ekstresi")
+        df_rf = run_query_df("SELECT firma_adi FROM firmalar ORDER BY firma_adi ASC")
+
+        if df_rf.empty:
+            st.warning("⚠️ Önce 'Firmalar' sekmesinden en az bir firma ekleyin.")
+        else:
+            firmalar_rapor = df_rf["firma_adi"].tolist()
+            c1, c2, c3, c4 = st.columns([2, 1, 1, 1.3])
+            with c1:
+                rfirma = st.selectbox("Firma", firmalar_rapor, key="prof_toptan_firma")
+            with c2:
+                rbas = st.date_input("Başlangıç", datetime.now().replace(day=1), key="prof_toptan_bas")
+            with c3:
+                rbit = st.date_input("Bitiş", datetime.now(), key="prof_toptan_bit")
+            with c4:
+                rturu = st.radio("Görünüm", ["Detaylı", "Özet"], horizontal=True, key="prof_toptan_gorunum")
+
+            if rbas > rbit:
+                st.error("⚠️ Başlangıç tarihi bitiş tarihinden büyük olamaz.")
+            else:
+                rb2 = rbas.strftime("%Y-%m-%d")
+                re2 = rbit.strftime("%Y-%m-%d")
+                df_rt = run_query_df("""
+                    SELECT id, tarih, islem_turu, adet, birim_fiyat, toplam_tutar, aciklama
+                    FROM toptan_satis
+                    WHERE firma_adi = ?
+                      AND SUBSTR(tarih,1,10) BETWEEN ? AND ?
+                    ORDER BY SUBSTR(tarih,1,10) ASC, id ASC
+                """, [rfirma, rb2, re2])
+
+                df_dev = run_query_df("""
+                    SELECT COALESCE(SUM(CASE WHEN islem_turu='Satış' THEN toplam_tutar ELSE -toplam_tutar END),0) AS devir
+                    FROM toptan_satis
+                    WHERE firma_adi=? AND SUBSTR(tarih,1,10) < ?
+                """, [rfirma, rb2])
+                devir = _num(df_dev["devir"].iloc[0]) if not df_dev.empty else 0.0
+                satis = _num(df_rt.loc[df_rt["islem_turu"] == "Satış", "toplam_tutar"].sum()) if not df_rt.empty else 0.0
+                tahsilat = _num(df_rt.loc[df_rt["islem_turu"] == "Tahsilat", "toplam_tutar"].sum()) if not df_rt.empty else 0.0
+                bakiye = devir + satis - tahsilat
+
+                m1, m2, m3, m4 = st.columns(4)
+                m1.metric("↩️ Devir", _money(devir))
+                m2.metric("🧾 Dönem Satış", _money(satis))
+                m3.metric("💵 Tahsilat", _money(tahsilat))
+                m4.metric("📌 Kapanış Bakiyesi", _money(bakiye))
+
+                if not df_rt.empty:
+                    st.markdown("#### 📒 Cari Hareketler")
+                    if rturu == "Detaylı":
+                        df_cari = df_rt.copy()
+                        running = devir
+                        bakiye_list = []
+                        for _, rr in df_cari.iterrows():
+                            tut = _num(rr["toplam_tutar"])
+                            running += tut if rr["islem_turu"] == "Satış" else -tut
+                            bakiye_list.append(running)
+                        df_cari["bakiye"] = bakiye_list
+                        df_cari = df_cari[["tarih", "islem_turu", "adet", "birim_fiyat", "toplam_tutar", "bakiye", "aciklama"]]
+                        df_cari.columns = ["Tarih", "İşlem", "Adet", "Birim Fiyat", "Tutar", "Bakiye", "Açıklama"]
+                    else:
+                        df_cari = pd.DataFrame({
+                            "İşlem": ["Devir", "Dönem Satış", "Tahsilat", "Kapanış Bakiyesi"],
+                            "Tutar (TL)": [devir, satis, tahsilat, bakiye]
+                        })
+                    st.dataframe(df_cari, use_container_width=True, hide_index=True)
+
+                    st.markdown("#### 📅 Aylık Hareket Özeti")
+                    df_ay_t = run_query_df("""
+                        SELECT SUBSTR(tarih,1,7) AS 'Ay',
+                               SUM(CASE WHEN islem_turu='Satış' THEN toplam_tutar ELSE 0 END) AS 'Satış',
+                               SUM(CASE WHEN islem_turu='Tahsilat' THEN toplam_tutar ELSE 0 END) AS 'Tahsilat'
+                        FROM toptan_satis
+                        WHERE firma_adi=? AND SUBSTR(tarih,1,10) BETWEEN ? AND ?
+                        GROUP BY SUBSTR(tarih,1,7)
+                        ORDER BY SUBSTR(tarih,1,7) ASC
+                    """, [rfirma, rb2, re2])
+                    if not df_ay_t.empty:
+                        df_ay_t["Net Hareket"] = df_ay_t["Satış"].fillna(0) - df_ay_t["Tahsilat"].fillna(0)
+                        st.dataframe(df_ay_t, use_container_width=True, hide_index=True)
+
+                    pdf_bytes = build_toptan_pdf(df_rt, rfirma, rb2, re2, devir, satis, tahsilat, bakiye)
+                    st.download_button(
+                        "📥 Firma Cari Ekstresini PDF İndir",
+                        data=pdf_bytes,
+                        file_name=f"cari_ekstre_{rfirma}_{rb2}_{re2}.pdf".replace(" ", "_"),
+                        mime="application/pdf",
+                        type="primary",
+                        use_container_width=True,
+                        key="pdf_toptan_prof"
+                    )
+                else:
+                    st.info("🔍 Seçilen firma ve tarih aralığında hareket bulunamadı.")
 
 
 # ==========================================
-# 5. SEKME: BORÇ / ALACAK
+# 5. SEKME: TÜM BORÇ / ALACAK ÖZETİ (YENİ SEKME)
 # ==========================================
 with tab5:
-
-    st.subheader("💰 Borç / Alacak")
-
-    # =====================================================
-    # FİRMA BORÇ / ALACAK HESAPLAMA
-    # =====================================================
-
-    df_borc_alacak = run_query_df(
-        """
-        SELECT
-            f.firma_adi,
-
-            COALESCE(
-                (
-                    SELECT SUM(t1.toplam_tutar)
-                    FROM toptan_satis t1
-                    WHERE t1.firma_adi = f.firma_adi
-                      AND t1.islem_turu = 'Satış'
-                ),
-                0
-            ) AS toplam_satis,
-
-            COALESCE(
-                (
-                    SELECT SUM(t2.toplam_tutar)
-                    FROM toptan_satis t2
-                    WHERE t2.firma_adi = f.firma_adi
-                      AND t2.islem_turu = 'Tahsilat'
-                ),
-                0
-            ) AS toplam_tahsilat
-
-        FROM firmalar f
-        ORDER BY f.firma_adi ASC
-        """
-    )
-
-    if df_borc_alacak.empty:
-
-        st.info("Henüz kayıtlı firma bulunmuyor.")
-
-    else:
-
-        # =====================================================
-        # SAYISAL ALANLAR
-        # =====================================================
-
-        df_borc_alacak["toplam_satis"] = pd.to_numeric(
-            df_borc_alacak["toplam_satis"],
-            errors="coerce"
-        ).fillna(0.0)
-
-        df_borc_alacak["toplam_tahsilat"] = pd.to_numeric(
-            df_borc_alacak["toplam_tahsilat"],
-            errors="coerce"
-        ).fillna(0.0)
-
-        df_borc_alacak["bakiye"] = (
-            df_borc_alacak["toplam_satis"]
-            - df_borc_alacak["toplam_tahsilat"]
-        )
-
-        # =====================================================
-        # DURUM
-        # =====================================================
-
-        def durum_belirle(bakiye):
-
-            if bakiye > 0:
-                return "BORÇLU"
-
-            elif bakiye < 0:
-                return "ALACAKLI"
-
-            else:
-                return "KAPALI"
-
-        df_borc_alacak["durum"] = (
-            df_borc_alacak["bakiye"]
-            .apply(durum_belirle)
-        )
-
-        # =====================================================
-        # GENEL SAYILAR
-        # =====================================================
-
-        borclu_sayisi = len(
-            df_borc_alacak[
-                df_borc_alacak["bakiye"] > 0
-            ]
-        )
-
-        alacakli_sayisi = len(
-            df_borc_alacak[
-                df_borc_alacak["bakiye"] < 0
-            ]
-        )
-
-        kapali_sayisi = len(
-            df_borc_alacak[
-                df_borc_alacak["bakiye"] == 0
-            ]
-        )
-
-        genel_bakiye = (
-            df_borc_alacak["bakiye"].sum()
-        )
-
-        # =====================================================
-        # ÜST ÖZET
-        # =====================================================
-
-        st.markdown("### Genel Durum")
-
-        o1, o2, o3, o4 = st.columns(4)
-
-        with o1:
-            st.metric(
-                "Borçlu",
-                f"{borclu_sayisi} Firma"
-            )
-
-        with o2:
-            st.metric(
-                "Alacaklı",
-                f"{alacakli_sayisi} Firma"
-            )
-
-        with o3:
-            st.metric(
-                "Hesabı Kapalı",
-                f"{kapali_sayisi} Firma"
-            )
-
-        with o4:
-            st.metric(
-                "Genel Bakiye",
-                f"{genel_bakiye:,.2f} TL"
-            )
-
-        st.divider()
-
-        # =====================================================
-        # FİLTRE
-        # =====================================================
-
-        f1, f2 = st.columns([2, 5])
-
-        with f1:
-
-            durum_filtresi = st.selectbox(
-                "Firma Durumu",
-                [
-                    "Tümü",
-                    "Borçlular",
-                    "Alacaklılar",
-                    "Hesabı Kapalı"
-                ],
-                key="borc_alacak_firma_filtre"
-            )
-
-        # =====================================================
-        # FİLTRE UYGULA
-        # =====================================================
-
-        if durum_filtresi == "Borçlular":
-
-            df_goster = df_borc_alacak[
-                df_borc_alacak["bakiye"] > 0
-            ].copy()
-
-        elif durum_filtresi == "Alacaklılar":
-
-            df_goster = df_borc_alacak[
-                df_borc_alacak["bakiye"] < 0
-            ].copy()
-
-        elif durum_filtresi == "Hesabı Kapalı":
-
-            df_goster = df_borc_alacak[
-                df_borc_alacak["bakiye"] == 0
-            ].copy()
-
+    st.subheader("💰 Tüm Firmaların Borç / Alacak Listesi")
+    st.write("Sistemde kayıtlı bütün firmaların borç ve alacak durumlarını toplu olarak görüntüleyin.")
+    
+    # BUTON İLE BORÇLU/ALACAKLI LİSTESİ GETİRME
+    if st.button("📊 Tüm Firmaların Borç/Alacak Listesini Getir", type="primary"):
+        df_f_all = run_query_df("SELECT firma_adi FROM firmalar ORDER BY firma_adi ASC")
+        
+        if df_f_all.empty:
+            st.warning("Henüz kayıtlı firma bulunmuyor.")
         else:
-
-            df_goster = df_borc_alacak.copy()
-
-        # =====================================================
-        # FİRMA LİSTESİ
-        # =====================================================
-
-        st.markdown("### Firma Listesi")
-
-        if df_goster.empty:
-
-            st.info(
-                "Bu filtreye uygun firma bulunamadı."
-            )
-
-        else:
-
-            for _, firma in df_goster.iterrows():
-
-                firma_adi = str(
-                    firma["firma_adi"]
-                )
-
-                satis = float(
-                    firma["toplam_satis"]
-                )
-
-                tahsilat = float(
-                    firma["toplam_tahsilat"]
-                )
-
-                bakiye = float(
-                    firma["bakiye"]
-                )
-
-                # -----------------------------------------
-                # BORÇLU
-                # -----------------------------------------
-
+            ozet_veri = []
+            toplam_piyasa_borcu = 0.0
+            
+            for f_adi in df_f_all["firma_adi"]:
+                s_res = run_query_df("SELECT SUM(toplam_tutar) as t FROM toptan_satis WHERE firma_adi=? AND islem_turu='Satış'", [f_adi])
+                t_res = run_query_df("SELECT SUM(toplam_tutar) as t FROM toptan_satis WHERE firma_adi=? AND islem_turu='Tahsilat'", [f_adi])
+                
+                satis_t = s_res['t'].iloc[0] if not s_res.empty and pd.notnull(s_res['t'].iloc[0]) else 0.0
+                tahsilat_t = t_res['t'].iloc[0] if not t_res.empty and pd.notnull(t_res['t'].iloc[0]) else 0.0
+                bakiye = satis_t - tahsilat_t
+                
                 if bakiye > 0:
-
                     durum = "🔴 BORÇLU"
-
-                    bakiye_yazi = (
-                        f"{bakiye:,.2f} TL BORÇ"
-                    )
-
-                # -----------------------------------------
-                # ALACAKLI
-                # -----------------------------------------
-
+                    toplam_piyasa_borcu += bakiye
                 elif bakiye < 0:
-
-                    durum = "🟢 ALACAKLI"
-
-                    bakiye_yazi = (
-                        f"{abs(bakiye):,.2f} TL ALACAK"
-                    )
-
-                # -----------------------------------------
-                # KAPALI
-                # -----------------------------------------
-
+                    durum = "🟢 ALACAKLI (Fazla Ödeme)"
                 else:
-
-                    durum = "⚪ KAPALI"
-
-                    bakiye_yazi = "0,00 TL"
-
-                # =================================================
-                # FİRMA KARTI
-                # =================================================
-
-                with st.container(border=True):
-
-                    c1, c2, c3, c4 = st.columns(
-                        [3, 2, 2, 2]
-                    )
-
-                    with c1:
-
-                        st.markdown(
-                            f"**🏢 {firma_adi}**"
-                        )
-
-                        st.caption(
-                            durum
-                        )
-
-                    with c2:
-
-                        st.caption("Satış")
-
-                        st.write(
-                            f"**{satis:,.2f} TL**"
-                        )
-
-                    with c3:
-
-                        st.caption("Tahsilat")
-
-                        st.write(
-                            f"**{tahsilat:,.2f} TL**"
-                        )
-
-                    with c4:
-
-                        st.caption("Bakiye")
-
-                        if bakiye > 0:
-
-                            st.markdown(
-                                f"**🔴 {bakiye_yazi}**"
-                            )
-
-                        elif bakiye < 0:
-
-                            st.markdown(
-                                f"**🟢 {bakiye_yazi}**"
-                            )
-
-                        else:
-
-                            st.markdown(
-                                f"**⚪ {bakiye_yazi}**"
-                            )
-
-        # =====================================================
-        # FİRMA DETAYI
-        # =====================================================
-
-        st.divider()
-
-        st.markdown("### 🔎 Firma Detayı")
-
-        firma_sec = st.selectbox(
-            "Firma Seçin",
-            df_borc_alacak[
-                "firma_adi"
-            ].tolist(),
-            key="borc_alacak_detay_firma"
-        )
-
-        firma_bilgi = df_borc_alacak[
-            df_borc_alacak["firma_adi"] == firma_sec
-        ].iloc[0]
-
-        detay_satis = float(
-            firma_bilgi["toplam_satis"]
-        )
-
-        detay_tahsilat = float(
-            firma_bilgi["toplam_tahsilat"]
-        )
-
-        detay_bakiye = float(
-            firma_bilgi["bakiye"]
-        )
-
-        # =====================================================
-        # DETAY ÖZETİ
-        # =====================================================
-
-        d1, d2, d3 = st.columns(3)
-
-        with d1:
-
-            st.metric(
-                "Toplam Satış",
-                f"{detay_satis:,.2f} TL"
-            )
-
-        with d2:
-
-            st.metric(
-                "Toplam Tahsilat",
-                f"{detay_tahsilat:,.2f} TL"
-            )
-
-        with d3:
-
-            if detay_bakiye > 0:
-
-                st.metric(
-                    "Kalan Borç",
-                    f"{detay_bakiye:,.2f} TL"
-                )
-
-            elif detay_bakiye < 0:
-
-                st.metric(
-                    "Alacak",
-                    f"{abs(detay_bakiye):,.2f} TL"
-                )
-
-            else:
-
-                st.metric(
-                    "Bakiye",
-                    "0,00 TL"
-                )
-
-        # =====================================================
-        # İŞLEM GEÇMİŞİ
-        # =====================================================
-
-        st.markdown(
-            f"#### {firma_sec} - İşlem Geçmişi"
-        )
-
-        df_firma_hareket = run_query_df(
-            """
-            SELECT
-                id,
-                tarih,
-                islem_turu,
-                adet,
-                birim_fiyat,
-                toplam_tutar,
-                aciklama
-            FROM toptan_satis
-            WHERE firma_adi = ?
-            ORDER BY tarih ASC, id ASC
-            """,
-            [firma_sec]
-        )
-
-        if df_firma_hareket.empty:
-
-            st.info(
-                "Bu firmaya ait işlem kaydı bulunmuyor."
-            )
-
-        else:
-
-            df_firma_hareket[
-                "toplam_tutar"
-            ] = pd.to_numeric(
-                df_firma_hareket["toplam_tutar"],
-                errors="coerce"
-            ).fillna(0.0)
-
-            # -----------------------------------------
-            # BORÇ HAREKETİ
-            # -----------------------------------------
-
-            df_firma_hareket[
-                "borc_hareket"
-            ] = df_firma_hareket.apply(
-                lambda row:
-                    float(row["toplam_tutar"])
-                    if row["islem_turu"] == "Satış"
-                    else 0.0,
-                axis=1
-            )
-
-            # -----------------------------------------
-            # TAHSİLAT HAREKETİ
-            # -----------------------------------------
-
-            df_firma_hareket[
-                "tahsilat_hareket"
-            ] = df_firma_hareket.apply(
-                lambda row:
-                    float(row["toplam_tutar"])
-                    if row["islem_turu"] == "Tahsilat"
-                    else 0.0,
-                axis=1
-            )
-
-            # -----------------------------------------
-            # KALAN BAKİYE
-            # -----------------------------------------
-
-            df_firma_hareket[
-                "kalan_bakiye"
-            ] = (
-                df_firma_hareket["borc_hareket"]
-                - df_firma_hareket["tahsilat_hareket"]
-            ).cumsum()
-
-            # -----------------------------------------
-            # GÖSTERİLECEK TABLO
-            # -----------------------------------------
-
-            df_detay_goster = df_firma_hareket[
-                [
-                    "tarih",
-                    "islem_turu",
-                    "adet",
-                    "birim_fiyat",
-                    "toplam_tutar",
-                    "kalan_bakiye",
-                    "aciklama"
-                ]
-            ].copy()
-
-            df_detay_goster.columns = [
-                "Tarih",
-                "İşlem",
-                "Adet",
-                "Birim Fiyat",
-                "Tutar",
-                "Kalan Bakiye",
-                "Açıklama"
-            ]
-
-            st.dataframe(
-                df_detay_goster,
-                use_container_width=True,
-                hide_index=True
-            )
-
-        # =====================================================
-        # SON DURUM
-        # =====================================================
-
-        if detay_bakiye > 0:
-
-            st.error(
-                f"{firma_sec}: "
-                f"{detay_bakiye:,.2f} TL borç bulunuyor."
-            )
-
-        elif detay_bakiye < 0:
-
-            st.success(
-                f"{firma_sec}: "
-                f"{abs(detay_bakiye):,.2f} TL alacak bulunuyor."
-            )
-
-        else:
-
-            st.info(
-                f"{firma_sec}: "
-                f"Hesap kapalı."
-            )
+                    durum = "⚪ HESAP KAPALI (0.00 TL)"
+                    
+                ozet_veri.append({
+                    "Firma Ünvanı": f_adi,
+                    "Toplam Satış (TL)": f"{satis_t:,.2f}",
+                    "Toplam Tahsilat (TL)": f"{tahsilat_t:,.2f}",
+                    "Net Bakiye (TL)": f"{abs(bakiye):,.2f}",
+                    "Durum": durum
+                })
+            
+            df_ozet = pd.DataFrame(ozet_veri)
+            
+            st.success(f"📌 **Toplam Piyasa Alacağınız:** {toplam_piyasa_borcu:,.2f} TL")
+            st.dataframe(df_ozet, use_container_width=True)
