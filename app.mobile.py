@@ -315,6 +315,145 @@ st.markdown(f"""
         font-size:12px;
         margin-top:-4px;
     }}
+
+
+    /* =====================================================
+       MODERN ANA GİRİŞ EKRANI
+       ===================================================== */
+    .welcome-shell {
+        max-width: 920px;
+        margin: 18px auto 22px auto;
+        padding: 24px 28px 20px 28px;
+        border-radius: 24px;
+        background: linear-gradient(135deg, rgba(10,15,25,.96), rgba(31,26,17,.93));
+        border: 1px solid rgba(229,193,88,.35);
+        box-shadow: 0 18px 45px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.06);
+        text-align: center;
+    }
+    .welcome-brand {
+        color: #f6df9b;
+        font-size: 18px;
+        font-weight: 800;
+        letter-spacing: 2px;
+    }
+    .welcome-title {
+        margin-top: 3px;
+        color: #ffffff;
+        font-size: clamp(24px, 4vw, 34px);
+        line-height: 1.15;
+        font-weight: 950;
+        letter-spacing: .5px;
+    }
+    .welcome-subtitle {
+        margin-top: 10px;
+        color: #cbd5e1;
+        font-size: 14px;
+        font-weight: 600;
+    }
+    .welcome-meta {
+        display:flex;
+        justify-content:center;
+        flex-wrap:wrap;
+        gap:8px;
+        margin-top:15px;
+    }
+    .welcome-meta span {
+        padding: 6px 11px;
+        border-radius: 999px;
+        background: rgba(255,255,255,.07);
+        border: 1px solid rgba(255,255,255,.10);
+        color:#e5e7eb !important;
+        font-size:12px;
+        font-weight:700 !important;
+        text-shadow:none !important;
+    }
+    .home-section-title {
+        max-width: 920px;
+        margin: 18px auto 10px auto;
+        color:#f6df9b !important;
+        font-size:13px;
+        font-weight:900 !important;
+        letter-spacing:1.8px;
+        text-shadow:none !important;
+    }
+    .home-card {
+        min-height: 170px;
+        display:flex;
+        gap:16px;
+        align-items:flex-start;
+        padding:20px;
+        margin-bottom:8px;
+        border-radius:20px;
+        background: linear-gradient(145deg, rgba(15,23,42,.96), rgba(27,30,38,.94));
+        border:1px solid rgba(255,255,255,.11);
+        box-shadow: 0 12px 30px rgba(0,0,0,.30);
+        transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+    }
+    .home-card:hover {
+        transform: translateY(-2px);
+        border-color: rgba(229,193,88,.48);
+        box-shadow: 0 16px 34px rgba(0,0,0,.38);
+    }
+    .home-card-icon {
+        width:58px;
+        height:58px;
+        flex:0 0 58px;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        border-radius:16px;
+        background: linear-gradient(145deg, rgba(229,193,88,.22), rgba(255,255,255,.06));
+        border:1px solid rgba(229,193,88,.25);
+        font-size:30px;
+    }
+    .home-card-body { min-width:0; flex:1; }
+    .home-card-title {
+        color:#ffffff;
+        font-size:19px;
+        font-weight:900;
+        letter-spacing:.3px;
+    }
+    .home-card-desc {
+        margin-top:5px;
+        min-height:40px;
+        color:#cbd5e1;
+        font-size:12px;
+        line-height:1.5;
+        font-weight:600;
+    }
+    .home-card-stat {
+        display:flex;
+        align-items:baseline;
+        gap:7px;
+        margin-top:12px;
+    }
+    .home-card-stat b {
+        color:#f6df9b;
+        font-size:17px;
+        font-weight:900;
+    }
+    .home-card-stat span {
+        color:#94a3b8;
+        font-size:11px;
+        font-weight:700;
+    }
+    /* Sadece ana menü kartlarının hemen altındaki butonları modernleştirir. */
+    .stButton > button {
+        border-radius:12px !important;
+        min-height:44px !important;
+        font-weight:900 !important;
+    }
+    .home-card + div button {
+        background: linear-gradient(135deg,#c5a059,#8d6f2d) !important;
+        border:1px solid rgba(246,223,155,.65) !important;
+        color:#fff !important;
+        box-shadow:0 7px 18px rgba(0,0,0,.25) !important;
+    }
+    .home-card + div button:hover {
+        filter:brightness(1.08);
+        transform:translateY(-1px);
+    }
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -649,6 +788,9 @@ components.html(
 
 # Ana menüde kullanılacak özetler
 if st.session_state.aktif_sayfa == "ANA_MENU":
+    # =====================================================
+    # MODERN GİRİŞ / YÖNETİM PANELİ
+    # =====================================================
     df_d_ay = run_query_df("""
         SELECT
             COALESCE(SUM(CASE WHEN islem_tipi='Günlük Satış (Gelir)' THEN tutar ELSE 0 END),0) AS gelir,
@@ -675,55 +817,71 @@ if st.session_state.aktif_sayfa == "ANA_MENU":
     firma_sayisi = int(df_f_say['adet'].iloc[0]) if not df_f_say.empty else 0
     ay_net = ay_gelir - ay_gider
 
+    # Giriş ekranında okunabilirliği artıran ayrı, koyu bir çalışma alanı.
     st.markdown(f"""
-    <div class="hero-panel">
-        <div class="hero-title">🦪 MİDYECİ ABLA • YÖNETİM MERKEZİ</div>
-        <div class="hero-sub">Hoş geldin abi. Yapmak istediğin işlemi aşağıdan seç; seçtiğin bölümün içine geçelim.</div>
-        <span class="status-pill">● VERİTABANI BAĞLI • {firma_sayisi} FİRMA KAYITLI</span>
+    <div class="welcome-shell">
+        <div class="welcome-brand">🦪 MİDYECİ ABLA</div>
+        <div class="welcome-title">CANLI TAKİP & YÖNETİM MERKEZİ</div>
+        <div class="welcome-subtitle">Yapmak istediğin işlemi seç. Bir bölüme girdiğinde sadece o bölümü görürsün.</div>
+        <div class="welcome-meta">
+            <span>● Sistem bağlı</span>
+            <span>📅 {now_tr.strftime('%d.%m.%Y')}</span>
+            <span>🏢 {firma_sayisi} firma</span>
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
-    st.markdown('<div class="section-ribbon">🧭 ANA İŞLEM MENÜSÜ</div>', unsafe_allow_html=True)
-    st.caption("Önce bölümü seç. İçeri girdiğinde kendi işlemlerini yap; üstteki Geri butonuyla bu menüye dönebilirsin.")
-
+    # Ana modüller: büyük, sade ve dokunmatik kullanıma uygun kartlar.
     menu_items = [
-        ("🏪 DÜKKAN", "Günlük satışlar, giderler, ciro, ekstre ve dükkan raporları", "DUKKAN"),
-        ("🚚 TOPTAN", "Toptan satış, tahsilat, tarih bazlı işlemler ve kayıt yönetimi", "TOPTAN"),
-        ("🏢 FİRMALAR", "Firma ekleme, düzenleme, silme ve firma bilgileri", "FIRMALAR"),
-        ("📊 CARİ EKSTRE", "Dükkan ve toptan cari raporları, bakiye ve profesyonel PDF", "EKSTRE"),
-        ("💰 BORÇ / ALACAK", "Firma bakiyeleri, borç-alacak durumu ve hareket geçmişi", "BORC"),
+        ("🏪", "DÜKKAN", "Günlük satış, gider, ciro ve dükkan raporları", "DUKKAN", _money(ay_net), "Bu ay net"),
+        ("🚚", "TOPTAN", "Satış, tahsilat, firma işlemleri ve kayıt yönetimi", "TOPTAN", _money(ay_toptan_satis), "Bu ay satış"),
+        ("🏢", "FİRMALAR", "Firma ekle, düzenle, sil ve iletişim bilgilerini yönet", "FIRMALAR", f"{firma_sayisi}", "Kayıtlı firma"),
+        ("📊", "CARİ EKSTRE", "Dükkan ve toptan hareketlerini profesyonel raporla", "EKSTRE", "PDF", "Rapor merkezi"),
+        ("💰", "BORÇ / ALACAK", "Firma bakiyeleri, borç-alacak ve hareket geçmişi", "BORC", _money(ay_toptan_satis-ay_toptan_tahsilat), "Açık bakiye"),
     ]
 
-    for baslik, aciklama, hedef in menu_items:
-        c1, c2 = st.columns([5.8, 1.2])
-        with c1:
-            st.markdown(
-                f"""<div class="menu-card"><div class="menu-title">{baslik}</div><div class="menu-desc">{aciklama}</div></div>""",
-                unsafe_allow_html=True,
-            )
-        with c2:
-            if st.button("AÇ  ›", key=f"ana_menu_{hedef}", use_container_width=True):
-                st.session_state.aktif_sayfa = hedef
+    st.markdown('<div class="home-section-title">MENÜLER</div>', unsafe_allow_html=True)
+
+    # 2 kolon: daha az kalabalık, daha büyük ve okunabilir kartlar.
+    def render_home_card(col, item):
+        icon, title, desc, target, stat, stat_label = item
+        with col:
+            st.markdown(f"""
+            <div class="home-card">
+                <div class="home-card-icon">{icon}</div>
+                <div class="home-card-body">
+                    <div class="home-card-title">{title}</div>
+                    <div class="home-card-desc">{desc}</div>
+                    <div class="home-card-stat"><b>{stat}</b><span>{stat_label}</span></div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            if st.button(f"{title}  →", key=f"ana_menu_{target}", use_container_width=True):
+                st.session_state.aktif_sayfa = target
                 st.rerun()
 
-    st.markdown('<div class="section-ribbon">📊 HIZLI DURUM</div>', unsafe_allow_html=True)
-    k1,k2,k3,k4 = st.columns(4)
-    k1.metric("🏪 Dükkan Net", _money(ay_net))
-    k2.metric("🚚 Toptan Satış", _money(ay_toptan_satis))
-    k3.metric("💵 Toptan Tahsilat", _money(ay_toptan_tahsilat))
-    k4.metric("🏢 Firma", f"{firma_sayisi:,}")
+    for i in range(0, 4, 2):
+        cols = st.columns(2, gap="large")
+        render_home_card(cols[0], menu_items[i])
+        render_home_card(cols[1], menu_items[i+1])
 
-    qc1, qc2 = st.columns([2, 1])
-    with qc1:
-        st.markdown(f"**📅 Bugün:** `{now_tr.strftime('%d.%m.%Y')}` &nbsp;&nbsp; **🕒 Saat:** `{now_tr.strftime('%H:%M:%S')}`")
-    with qc2:
-        if st.button("🔄 Paneli Yenile", use_container_width=True, key="dashboard_refresh_home"):
-            st.rerun()
+    # Beşinci kartı ortada tutarak giriş ekranını görsel olarak dengeliyoruz.
+    center_cols = st.columns([1, 2, 1], gap="large")
+    render_home_card(center_cols[1], menu_items[4])
 
-    with st.expander("🛡️ Veri Güvenliği • Mevcut Kayıtları Yedekle", expanded=False):
-        st.caption("Bu işlem veritabanındaki kayıtları silmez veya değiştirmez; sadece CSV arşivi oluşturur.")
+    # Günlük özet: giriş ekranını rapor ekranına çevirmeden bilgi verir.
+    st.markdown('<div class="home-section-title">BUGÜN / HIZLI BİLGİ</div>', unsafe_allow_html=True)
+    q1, q2, q3, q4 = st.columns(4)
+    q1.metric("🏪 Dükkan Net", _money(ay_net))
+    q2.metric("🚚 Toptan Satış", _money(ay_toptan_satis))
+    q3.metric("💵 Tahsilat", _money(ay_toptan_tahsilat))
+    q4.metric("📁 Hareket", f"{int(_safe_sum(df_d_ay, 'hareket') + _safe_sum(df_t_ay, 'hareket')):,}")
+
+    # Girişte yalnızca gerektiğinde açılan güvenlik/yedek alanı.
+    with st.expander("🛡️ Veri Güvenliği • Yedek Al", expanded=False):
+        st.caption("Mevcut kayıtları silmez veya değiştirmez. Sadece üç ana tabloyu CSV olarak ZIP arşivine koyar.")
         st.download_button(
-            "📦 3 Tabloyu ZIP Olarak Yedekle",
+            "📦 Yedek ZIP Oluştur",
             data=create_full_backup_zip(),
             file_name=f"midyeci_abla_yedek_{now_tr.strftime('%Y%m%d_%H%M%S')}.zip",
             mime="application/zip",
