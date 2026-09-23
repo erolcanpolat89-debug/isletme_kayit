@@ -240,6 +240,90 @@ st.markdown(f"""
         text-shadow: none !important;
     }}
 
+    /* =========================================================
+       RGB NEON CERCEVE - TUM ANA PENCERE / KARTLAR
+       ========================================================= */
+    @keyframes rgbBorderFlow {{
+        0% {{
+            border-color: #ff1744;
+            box-shadow: 0 0 7px rgba(255, 23, 68, 0.65), inset 0 0 8px rgba(255, 23, 68, 0.10);
+        }}
+        16% {{
+            border-color: #ff9100;
+            box-shadow: 0 0 9px rgba(255, 145, 0, 0.65), inset 0 0 8px rgba(255, 145, 0, 0.10);
+        }}
+        33% {{
+            border-color: #ffee00;
+            box-shadow: 0 0 9px rgba(255, 238, 0, 0.60), inset 0 0 8px rgba(255, 238, 0, 0.10);
+        }}
+        50% {{
+            border-color: #00e676;
+            box-shadow: 0 0 9px rgba(0, 230, 118, 0.65), inset 0 0 8px rgba(0, 230, 118, 0.10);
+        }}
+        66% {{
+            border-color: #00b0ff;
+            box-shadow: 0 0 9px rgba(0, 176, 255, 0.65), inset 0 0 8px rgba(0, 176, 255, 0.10);
+        }}
+        83% {{
+            border-color: #7c4dff;
+            box-shadow: 0 0 9px rgba(124, 77, 255, 0.65), inset 0 0 8px rgba(124, 77, 255, 0.10);
+        }}
+        100% {{
+            border-color: #ff1744;
+            box-shadow: 0 0 7px rgba(255, 23, 68, 0.65), inset 0 0 8px rgba(255, 23, 68, 0.10);
+        }}
+    }}
+
+    /* Genel pencere/kart cerceveleri */
+    .neon-kutu,
+    div[data-testid="stForm"],
+    div[data-testid="stExpander"],
+    div[data-testid="stMetric"],
+    .preview-box,
+    .report-period-banner,
+    .welcome-shell,
+    .home-card,
+    .hero-panel,
+    .dashboard-card,
+    .menu-card,
+    .stat-card,
+    .section-card {{
+        border: 1.5px solid #00b0ff;
+        animation: rgbBorderFlow 7s linear infinite;
+    }}
+
+    /* Ic kutular RGB isigi ile uyumlu kalsin */
+    div[data-testid="stForm"],
+    div[data-testid="stExpander"],
+    div[data-testid="stMetric"],
+    .preview-box,
+    .welcome-shell,
+    .home-card,
+    .hero-panel,
+    .dashboard-card,
+    .menu-card,
+    .stat-card,
+    .section-card {{
+        position: relative;
+        overflow: hidden;
+    }}
+
+    /* Uzerine gelince RGB isigi biraz guclensin */
+    div[data-testid="stForm"]:hover,
+    div[data-testid="stExpander"]:hover,
+    div[data-testid="stMetric"]:hover,
+    .preview-box:hover,
+    .welcome-shell:hover,
+    .home-card:hover,
+    .hero-panel:hover,
+    .dashboard-card:hover,
+    .menu-card:hover,
+    .stat-card:hover,
+    .section-card:hover {{
+        animation-duration: 3.2s;
+        transform: translateY(-1px);
+    }}
+
     /* Metrik Kartları */
     div[data-testid="stMetric"] {{
         background: rgba(15, 23, 42, 0.45);
