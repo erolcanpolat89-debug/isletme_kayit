@@ -407,6 +407,32 @@ def _num(value):
         return 0.0
 
 
+def _safe_sum(df, column):
+    """DataFrame içinden güvenli sayısal toplam döndürür."""
+    try:
+        if df is None or df.empty or column not in df.columns:
+            return 0.0
+        return float(pd.to_numeric(df[column], errors="coerce").fillna(0).sum())
+    except Exception:
+        return 0.0
+
+
+def create_full_backup_zip():
+    """Mevcut üç ana tabloyu değiştirmeden CSV olarak ZIP yedeği oluşturur."""
+    backup = BytesIO()
+    with zipfile.ZipFile(backup, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        tables = {
+            "dukkan_hareket.csv": "SELECT * FROM dukkan_hareket ORDER BY id ASC",
+            "toptan_satis.csv": "SELECT * FROM toptan_satis ORDER BY id ASC",
+            "firmalar.csv": "SELECT * FROM firmalar ORDER BY id ASC",
+        }
+        for filename, query in tables.items():
+            df = run_query_df(query)
+            zf.writestr(filename, df.to_csv(index=False, encoding="utf-8-sig"))
+    backup.seek(0)
+    return backup.getvalue()
+
+
 def _register_pdf_fonts():
     regular = "DejaVuSans.ttf"
     bold = "DejaVuSans-Bold.ttf"
