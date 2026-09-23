@@ -1640,10 +1640,733 @@ with tab2:
                         "🔍 Seçilen filtrelere uygun kayıt bulunamadı."
                     )
 
+
+# ==========================================
+# 3. SEKME: FİRMA YÖNETİMİ
+# ==========================================
+with tab3:
+
+    st.subheader("🏢 Firma Yönetimi")
+
+    # =====================================================
+    # FİRMA İŞLEMİ SEÇ
+    # =====================================================
+
+    f_islem = st.radio(
+        "İşlem Seçin:",
+        [
+            "Yeni Firma Ekle",
+            "Firma Düzenle / Sil"
+        ],
+        horizontal=True,
+        key="firma_yonetim_islem"
+    )
+
+    # =====================================================
+    # YENİ FİRMA EKLE
+    # =====================================================
+
+    if f_islem == "Yeni Firma Ekle":
+
+        with st.form(
+            "yeni_firma_form",
+            clear_on_submit=True
+        ):
+
+            yeni_f_adi = st.text_input(
+                "Firma Ünvanı / Adı *",
+                key="yeni_firma_adi"
+            )
+
+            yeni_f_tel = st.text_input(
+                "Telefon No",
+                key="yeni_firma_tel"
+            )
+
+            yeni_f_not = st.text_input(
+                "Açıklama / Not",
+                key="yeni_firma_not"
+            )
+
+            f_kaydet = st.form_submit_button(
+                "➕ Firmayı Kaydet",
+                type="primary",
+                use_container_width=True
+            )
+
+            if f_kaydet:
+
+                firma_adi_temiz = yeni_f_adi.strip()
+
+                if not firma_adi_temiz:
+
+                    st.error(
+                        "⚠️ Firma adı boş bırakılamaz."
+                    )
+
+                else:
+
+                    try:
+
+                        client.execute(
+                            """
+                            INSERT INTO firmalar
+                                (
+                                    firma_adi,
+                                    telefon,
+                                    aciklama
+                                )
+                            VALUES (?, ?, ?)
+                            """,
+                            [
+                                firma_adi_temiz,
+                                yeni_f_tel.strip(),
+                                yeni_f_not.strip()
+                            ]
+                        )
+
+                        st.success(
+                            f"✅ '{firma_adi_temiz}' firması başarıyla eklendi."
+                        )
+
+                        st.rerun()
+
+                    except Exception as firma_hata:
+
+                        st.error(
+                            "❌ Firma eklenemedi."
+                        )
+
+                        st.code(
+                            str(firma_hata)
+                        )
+
+    # =====================================================
+    # FİRMA DÜZENLE / SİL
+    # =====================================================
+
+    else:
+
+        df_firmalar_all = run_query_df(
+            """
+            SELECT
+                id,
+                firma_adi,
+                telefon,
+                aciklama
+            FROM firmalar
+            ORDER BY firma_adi ASC
+            """
+        )
+
+        if not df_firmalar_all.empty:
+
+            secili_f_id = st.selectbox(
+                "Düzenlenecek Firmayı Seçin:",
+                options=df_firmalar_all["id"].tolist(),
+                format_func=lambda x:
+                    df_firmalar_all.loc[
+                        df_firmalar_all["id"] == x,
+                        "firma_adi"
+                    ].iloc[0],
+                key="firma_duzenle_sec"
+            )
+
+            f_kayit = df_firmalar_all[
+                df_firmalar_all["id"] == secili_f_id
+            ].iloc[0]
+
+            with st.form(
+                "firma_duzenle_form"
+            ):
+
+                e_f_adi = st.text_input(
+                    "Firma Adı",
+                    value=str(
+                        f_kayit["firma_adi"]
+                    ),
+                    key="firma_duzenle_adi"
+                )
+
+                e_f_tel = st.text_input(
+                    "Telefon No",
+                    value=(
+                        str(
+                            f_kayit["telefon"]
+                        )
+                        if pd.notna(
+                            f_kayit["telefon"]
+                        )
+                        else ""
+                    ),
+                    key="firma_duzenle_tel"
+                )
+
+                e_f_not = st.text_input(
+                    "Açıklama",
+                    value=(
+                        str(
+                            f_kayit["aciklama"]
+                        )
+                        if pd.notna(
+                            f_kayit["aciklama"]
+                        )
+                        else ""
+                    ),
+                    key="firma_duzenle_not"
+                )
+
+                fc1, fc2 = st.columns(2)
+
+                with fc1:
+
+                    f_guncelle = (
+                        st.form_submit_button(
+                            "✏️ Güncelle",
+                            type="primary",
+                            use_container_width=True
+                        )
+                    )
+
+                with fc2:
+
+                    f_sil = (
+                        st.form_submit_button(
+                            "🗑️ Firmayı Sil",
+                            use_container_width=True
+                        )
+                    )
+
+                # -----------------------------------------
+                # FİRMA GÜNCELLE
+                # -----------------------------------------
+
+                if f_guncelle:
+
+                    yeni_adi = e_f_adi.strip()
+
+                    if not yeni_adi:
+
+                        st.error(
+                            "⚠️ Firma adı boş bırakılamaz."
+                        )
+
+                    else:
+
+                        try:
+
+                            client.execute(
+                                """
+                                UPDATE firmalar
+                                SET
+                                    firma_adi=?,
+                                    telefon=?,
+                                    aciklama=?
+                                WHERE id=?
+                                """,
+                                [
+                                    yeni_adi,
+                                    e_f_tel.strip(),
+                                    e_f_not.strip(),
+                                    int(secili_f_id)
+                                ]
+                            )
+
+                            st.success(
+                                "✅ Firma başarıyla güncellendi."
+                            )
+
+                            st.rerun()
+
+                        except Exception as firma_guncelle_hata:
+
+                            st.error(
+                                "❌ Firma güncellenemedi."
+                            )
+
+                            st.code(
+                                str(
+                                    firma_guncelle_hata
+                                )
+                            )
+
+                # -----------------------------------------
+                # FİRMA SİL
+                # -----------------------------------------
+
+                if f_sil:
+
+                    try:
+
+                        client.execute(
+                            """
+                            DELETE FROM firmalar
+                            WHERE id=?
+                            """,
+                            [
+                                int(secili_f_id)
+                            ]
+                        )
+
+                        st.success(
+                            "🗑️ Firma başarıyla silindi."
+                        )
+
+                        st.rerun()
+
+                    except Exception as firma_sil_hata:
+
+                        st.error(
+                            "❌ Firma silinemedi."
+                        )
+
+                        st.code(
+                            str(
+                                firma_sil_hata
+                            )
+                        )
+
+        else:
+
+            st.info(
+                "📭 Kayıtlı firma bulunmuyor."
+            )
+
+    # =====================================================
+    # KAYITLI FİRMALAR LİSTESİ
+    # =====================================================
+
+    st.divider()
+
+    st.markdown(
+        "### 📋 Kayıtlı Firmalar"
+    )
+
+    df_f_list = run_query_df(
+        """
+        SELECT
+            id AS 'ID',
+            firma_adi AS 'Firma Adı',
+            telefon AS 'Telefon',
+            aciklama AS 'Açıklama'
+        FROM firmalar
+        ORDER BY firma_adi ASC
+        """
+    )
+
+    if df_f_list.empty:
+
+        st.info(
+            "Henüz kayıtlı firma bulunmuyor."
+        )
+
+    else:
+
+        st.dataframe(
+            df_f_list,
+            use_container_width=True,
+            hide_index=True
+        )
+
+
 # ==========================================
 # 4. SEKME: CARİ EKSTRE & PDF RAPORLAR
 # ==========================================
 with tab4:
+
+    st.subheader(
+        "📄 Kurumsal Firma Ekstresi ve PDF Çıktısı"
+    )
+
+    # =====================================================
+    # 1. FİRMA / TARİH / EKSTRE TÜRÜ SEÇİMİ
+    # =====================================================
+
+    col_f1, col_f2, col_f3, col_f4 = st.columns(
+        [2, 1, 1, 1.5]
+    )
+
+    with col_f1:
+
+        secilen_firma = st.selectbox(
+            "Ekstresi Alınacak Firma:",
+            firma_listesi,
+            key="ekstre_firma_sec_temiz"
+        )
+
+    with col_f2:
+
+        bas_tarih = st.date_input(
+            "Başlangıç",
+            datetime.now().replace(day=1),
+            key="toptan_bas_tarih_temiz"
+        )
+
+    with col_f3:
+
+        bit_tarih = st.date_input(
+            "Bitiş",
+            datetime.now(),
+            key="toptan_bit_tarih_temiz"
+        )
+
+    with col_f4:
+
+        ekstre_tipi = st.radio(
+            "Ekstre Türü",
+            [
+                "🔍 Detaylı",
+                "📋 Özet"
+            ],
+            key="toptan_ekstre_tipi_sec_temiz",
+            horizontal=True
+        )
+
+    str_bas_tarih = bas_tarih.strftime(
+        "%Y-%m-%d"
+    )
+
+    str_bit_tarih = bit_tarih.strftime(
+        "%Y-%m-%d"
+    )
+
+    # =====================================================
+    # 2. TARİH KONTROLÜ
+    # =====================================================
+
+    if bas_tarih > bit_tarih:
+
+        st.error(
+            "⚠️ Başlangıç tarihi, bitiş tarihinden büyük olamaz."
+        )
+
+    else:
+
+        # =================================================
+        # 3. SEÇİLEN TARİH ARALIĞINDAKİ HAREKETLER
+        # =================================================
+
+        df_firma_hareket = run_query_df(
+            """
+            SELECT
+                id,
+                tarih,
+                islem_turu,
+                adet,
+                birim_fiyat,
+                toplam_tutar,
+                aciklama
+            FROM toptan_satis
+            WHERE firma_adi = ?
+              AND SUBSTR(tarih, 1, 10) BETWEEN ? AND ?
+            ORDER BY
+                SUBSTR(tarih, 1, 10) ASC,
+                id ASC
+            """,
+            [
+                secilen_firma,
+                str_bas_tarih,
+                str_bit_tarih
+            ]
+        )
+
+        # =================================================
+        # 4. DEVİR BAKİYE VE DEVİR ADET
+        # =================================================
+
+        df_devir = run_query_df(
+            """
+            SELECT
+
+                COALESCE(
+                    SUM(
+                        CASE
+                            WHEN islem_turu = 'Satış'
+                            THEN toplam_tutar
+                            ELSE -toplam_tutar
+                        END
+                    ),
+                    0
+                ) AS devir_bakiye,
+
+                COALESCE(
+                    SUM(
+                        CASE
+                            WHEN islem_turu = 'Satış'
+                            THEN adet
+                            ELSE 0
+                        END
+                    ),
+                    0
+                ) AS devir_adet
+
+            FROM toptan_satis
+
+            WHERE firma_adi = ?
+              AND SUBSTR(tarih, 1, 10) < ?
+            """,
+            [
+                secilen_firma,
+                str_bas_tarih
+            ]
+        )
+
+        if not df_devir.empty:
+
+            try:
+
+                devir_bakiye = float(
+                    df_devir.iloc[0][
+                        "devir_bakiye"
+                    ] or 0
+                )
+
+            except Exception:
+
+                devir_bakiye = 0.0
+
+            try:
+
+                devir_adet = int(
+                    df_devir.iloc[0][
+                        "devir_adet"
+                    ] or 0
+                )
+
+            except Exception:
+
+                devir_adet = 0
+
+        else:
+
+            devir_bakiye = 0.0
+            devir_adet = 0
+
+        # =================================================
+        # 5. HAREKET VARSA
+        # =================================================
+
+        if not df_firma_hareket.empty:
+
+            df_firma_hareket["adet"] = pd.to_numeric(
+                df_firma_hareket["adet"],
+                errors="coerce"
+            ).fillna(0)
+
+            df_firma_hareket["birim_fiyat"] = pd.to_numeric(
+                df_firma_hareket["birim_fiyat"],
+                errors="coerce"
+            ).fillna(0)
+
+            df_firma_hareket["toplam_tutar"] = pd.to_numeric(
+                df_firma_hareket["toplam_tutar"],
+                errors="coerce"
+            ).fillna(0)
+
+            df_firma_hareket["Borç"] = (
+                df_firma_hareket.apply(
+                    lambda row:
+                        float(row["toplam_tutar"])
+                        if row["islem_turu"] == "Satış"
+                        else 0.0,
+                    axis=1
+                )
+            )
+
+            df_firma_hareket["Tahsilat"] = (
+                df_firma_hareket.apply(
+                    lambda row:
+                        float(row["toplam_tutar"])
+                        if row["islem_turu"] == "Tahsilat"
+                        else 0.0,
+                    axis=1
+                )
+            )
+
+            df_firma_hareket["Net_Hareket"] = (
+                df_firma_hareket["Borç"]
+                - df_firma_hareket["Tahsilat"]
+            )
+
+            satis_adetleri = (
+                df_firma_hareket["adet"].where(
+                    df_firma_hareket["islem_turu"] == "Satış",
+                    0
+                )
+            )
+
+            df_firma_hareket["Kümülatif_Adet"] = (
+                devir_adet
+                + satis_adetleri.cumsum()
+            )
+
+            df_firma_hareket["Kalan_Bakiye"] = (
+                devir_bakiye
+                + df_firma_hareket[
+                    "Net_Hareket"
+                ].cumsum()
+            )
+
+            toplam_satis = float(
+                df_firma_hareket["Borç"].sum()
+            )
+
+            toplam_tahsilat = float(
+                df_firma_hareket["Tahsilat"].sum()
+            )
+
+            donem_adet = int(
+                df_firma_hareket.loc[
+                    df_firma_hareket["islem_turu"] == "Satış",
+                    "adet"
+                ].sum()
+            )
+
+            toplam_adet = (
+                devir_adet
+                + donem_adet
+            )
+
+            bakiye = (
+                devir_bakiye
+                + toplam_satis
+                - toplam_tahsilat
+            )
+
+            # =================================================
+            # 6. EKRAN METRİKLERİ
+            # =================================================
+
+            m1, m2, m3, m4 = st.columns(4)
+
+            with m1:
+
+                st.metric(
+                    "Toplam Satış (Borç)",
+                    f"{toplam_satis:,.2f} TL"
+                )
+
+            with m2:
+
+                st.metric(
+                    "Yapılan Tahsilat",
+                    f"{toplam_tahsilat:,.2f} TL"
+                )
+
+            with m3:
+
+                if bakiye > 0:
+
+                    st.metric(
+                        "Kalan Bakiye",
+                        f"{bakiye:,.2f} TL"
+                    )
+
+                elif bakiye < 0:
+
+                    st.metric(
+                        "Alacak Bakiyesi",
+                        f"{abs(bakiye):,.2f} TL"
+                    )
+
+                else:
+
+                    st.metric(
+                        "Kalan Bakiye",
+                        "0.00 TL"
+                    )
+
+            with m4:
+
+                st.metric(
+                    "Toplam Kümülatif Adet",
+                    f"{toplam_adet:,} Adet"
+                )
+
+            # =================================================
+            # 7. DEVİR BİLGİSİ
+            # =================================================
+
+            if devir_bakiye != 0 or devir_adet != 0:
+
+                st.info(
+                    f"📌 Devir Bakiye: "
+                    f"**{devir_bakiye:,.2f} TL** "
+                    f"| Devir Adet: "
+                    f"**{devir_adet:,} Adet**"
+                )
+
+            st.markdown("---")
+
+            # =================================================
+            # 8. EKRANDA GÖSTERİLECEK TABLO
+            # =================================================
+
+            if ekstre_tipi == "🔍 Detaylı":
+
+                df_gosterim = df_firma_hareket[
+                    [
+                        "tarih",
+                        "islem_turu",
+                        "adet",
+                        "Kümülatif_Adet",
+                        "birim_fiyat",
+                        "toplam_tutar",
+                        "Kalan_Bakiye",
+                        "aciklama"
+                    ]
+                ].copy()
+
+                df_gosterim.columns = [
+                    "Tarih",
+                    "İşlem",
+                    "Adet",
+                    "Kümülatif Adet",
+                    "Birim Fiyat",
+                    "Tutar",
+                    "Kalan Bakiye",
+                    "Açıklama"
+                ]
+
+            else:
+
+                df_gosterim = df_firma_hareket[
+                    [
+                        "tarih",
+                        "islem_turu",
+                        "adet",
+                        "Kümülatif_Adet",
+                        "toplam_tutar",
+                        "Kalan_Bakiye",
+                        "aciklama"
+                    ]
+                ].copy()
+
+                df_gosterim.columns = [
+                    "Tarih",
+                    "İşlem",
+                    "Adet",
+                    "Kümülatif Adet",
+                    "Tutar",
+                    "Kalan Bakiye",
+                    "Açıklama"
+                ]
+
+            st.markdown(
+                "### 📋 İşlem Geçmişi"
+            )
+
+            st.dataframe(
+                df_gosterim.iloc[::-1],
+                use_container_width=True,
+                hide_index=True
+            )
+
+            # =================================================
+            # BURADAN SONRASI
+            # =================================================
+            # SENİN MEVCUT CARİ EKSTRE + PDF KODUN
+            # AYNEN DEVAM EDECEK.
 
     st.subheader("📄 Kurumsal Firma Ekstresi ve PDF Çıktısı")
 
