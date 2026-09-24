@@ -602,6 +602,85 @@ st.markdown('\n<style>\n/* ANA SEKME TUŞLARI: DÜKKAN / TOPTAN / FİRMALAR / CA
 
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["🏪 Dükkan", "🚚 Toptan", "🏢 Firmalar", "📊 Cari Ekstre", "💰 Borç/Alacak"])
 
+
+st.markdown("""
+<style>
+/* ===== MİDYECİ ABLA ANA SEKME BUTONLARI ===== */
+body .top-main-tabs {
+    display: flex !important;
+    gap: 10px !important;
+    padding: 7px !important;
+    border-radius: 18px !important;
+    background: rgba(7,10,18,.78) !important;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.07), 0 8px 25px rgba(0,0,0,.30) !important;
+}
+body .top-main-tabs > button {
+    position: relative !important;
+    flex: 1 1 auto !important;
+    min-height: 54px !important;
+    padding: 10px 18px !important;
+    border: 2px solid transparent !important;
+    border-radius: 15px !important;
+    background:
+        linear-gradient(145deg, rgba(28,33,46,.98), rgba(7,10,17,.98)) padding-box,
+        linear-gradient(90deg,#ff304f,#ff9f1c,#ffe45e,#35e58b,#25b7ff,#7c5cff,#ff4fd8,#ff304f) border-box !important;
+    background-size: 100% 100%, 300% 100% !important;
+    animation: midyeciMainRGB 7s linear infinite !important;
+    color: #fff !important;
+    font-weight: 900 !important;
+    font-size: 15px !important;
+    cursor: pointer !important;
+    transition: transform .14s ease, filter .18s ease, box-shadow .18s ease, color .18s ease !important;
+    box-shadow: 0 5px 15px rgba(0,0,0,.34) !important;
+}
+body .top-main-tabs > button:hover {
+    transform: translateY(-4px) scale(1.025) !important;
+    color: #ffe68a !important;
+    filter: brightness(1.14) !important;
+    box-shadow: 0 0 18px rgba(255,200,60,.48), 0 11px 25px rgba(0,0,0,.40) !important;
+}
+body .top-main-tabs > button[aria-selected="true"] {
+    transform: translateY(3px) scale(.975) !important;
+    color: #ffe68a !important;
+    background:
+        linear-gradient(145deg, rgba(94,73,18,.99), rgba(28,26,16,.99)) padding-box,
+        linear-gradient(90deg,#ff304f,#ff9f1c,#ffe45e,#35e58b,#25b7ff,#7c5cff,#ff4fd8,#ff304f) border-box !important;
+    box-shadow:
+        inset 0 6px 13px rgba(0,0,0,.55),
+        inset 0 0 18px rgba(255,211,64,.16),
+        0 0 18px rgba(255,193,46,.42) !important;
+}
+body .top-main-tabs > button:active {
+    transform: translateY(6px) scale(.95) !important;
+    box-shadow: inset 0 7px 15px rgba(0,0,0,.62) !important;
+}
+@keyframes midyeciMainRGB {
+    0% { background-position: 0 0, 0% 50%; }
+    50% { background-position: 0 0, 100% 50%; }
+    100% { background-position: 0 0, 0% 50%; }
+}
+</style>
+""", unsafe_allow_html=True)
+
+# JS is intentionally tiny: it finds the first tablist (the 5 top-level tabs)
+# and adds a stable class to it. MutationObserver keeps it after Streamlit reruns.
+st.markdown("""
+<script>
+(function () {
+  function paintMainTabs() {
+    const lists = document.querySelectorAll('[role="tablist"]');
+    if (!lists.length) return;
+    const list = lists[0];
+    list.classList.add('top-main-tabs');
+  }
+  paintMainTabs();
+  const obs = new MutationObserver(paintMainTabs);
+  obs.observe(document.body, {subtree:true, childList:true});
+})();
+</script>
+""", unsafe_allow_html=True)
+
+
 bugun = datetime.now().strftime("%Y-%m-%d")
 
 # ==========================================
