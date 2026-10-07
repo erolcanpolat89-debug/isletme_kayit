@@ -1149,7 +1149,7 @@ with tab2:
                 else:
                     adet = 0
                     birim_fiyat = 0.0
-                    toplam_tutar = st.number_input("Tahsil Edilen Tutar (TL)", min_value=0.0, step=50.0, value=2430.0, format="%.2f")
+                    toplam_tutar = st.number_input("Tahsil Edilen Tutar (TL)", min_value=0.0, step=50.0, value=00.0, format="%.2f")
                     st.success(f"Tahsilat Tutarı: **{toplam_tutar:,.2f} TL**")
 
                 aciklama = st.text_input("Açıklama / Not")
